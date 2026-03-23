@@ -1,0 +1,47 @@
+# AI 사업비 집행 챗봇 인프라 (Marker 기반)
+# MongoDB + Qdrant + FastAPI
+
+services:
+  # 데이터 저장소
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_storage:/data/db
+
+  # 벡터 DB (RAG용)
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    restart: always
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_storage:/qdrant/storage
+
+  # FastAPI PDF 처리 서버
+  fastapi:
+    build:
+      context: .
+      dockerfile: Dockerfile.fastapi
+    container_name: fastapi
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    volumes:
+      - ./app.py:/app/app.py
+      - ./manual:/app/manual
+    depends_on:
+      - mongodb
+      - qdrant
+    command: uvicorn app:app --host 0.0.0.0 --port 5000 --reload
+
+# 도커 전용 볼륨 선언
+volumes:
+  mongodb_storage:
+  qdrant_storage:
