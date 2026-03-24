@@ -1,4 +1,4 @@
-# AI 사업비 집행 챗봇 인프라 (Marker 기반)
+# AI 사업비 집행 챗봇 인프라
 # MongoDB + Qdrant + FastAPI
 
 services:

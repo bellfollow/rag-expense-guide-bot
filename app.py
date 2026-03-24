@@ -23,6 +23,7 @@ import os
 import json
 import tempfile
 from pathlib import Path
+from datetime import datetime
 
 # Qdrant 벡터 DB
 from qdrant_client import QdrantClient
@@ -291,6 +292,60 @@ def filter_appendix_chunks(chunks: list[str]) -> list[str]:
     return filtered
 
 
+def update_processing_report(result: dict) -> None:
+    """
+    manual/output/processing_report.md 업데이트
+    처리된 파일 정보를 누적해서 기록
+    """
+    report_path = Path("/app/manual/output/processing_report.md")
+
+    # 기존 데이터 로드
+    records = {}
+    if report_path.exists():
+        content = report_path.read_text(encoding="utf-8")
+        # 기존 레코드 파싱 (파일명 기준으로 덮어쓰기)
+        for line in content.splitlines():
+            if line.startswith("| ") and not line.startswith("| 파일명") and not line.startswith("| ---"):
+                parts = [p.strip() for p in line.strip("| ").split("|")]
+                if len(parts) >= 4:
+                    records[parts[0]] = parts
+
+    # 새 레코드 추가/업데이트
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    records[result["filename"]] = [
+        result["filename"],
+        result.get("file_size_mb", "-"),
+        str(result["chunks_count"]),
+        now,
+        "✅"
+    ]
+
+    # 전체 청크 합계
+    total_chunks = sum(int(r[2]) for r in records.values() if r[2].isdigit())
+
+    # 리포트 작성
+    lines = [
+        "# PDF 처리 현황 보고서",
+        f"최종 업데이트: {now}",
+        "",
+        "## 전체 요약",
+        "| 항목 | 값 |",
+        "|------|-----|",
+        f"| 총 문서 수 | {len(records)} |",
+        f"| 총 청크 수 | {total_chunks:,} |",
+        f"| 마지막 처리 | {result['filename']} |",
+        "",
+        "## 문서별 상세",
+        "| 파일명 | 청크 수 | 처리 일시 | 상태 |",
+        "|--------|---------|-----------|------|",
+    ]
+    for r in sorted(records.values(), key=lambda x: x[0]):
+        lines.append(f"| {r[0]} | {r[2]} | {r[3]} | {r[4]} |")
+
+    report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"📊 Report updated: {report_path}")
+
+
 async def process_pdf(file_content: bytes, filename: str) -> dict:
     """
     단일 PDF 처리 파이프라인 (내부 공통 함수)
@@ -370,13 +425,22 @@ async def process_pdf(file_content: bytes, filename: str) -> dict:
     qdrant_client.upsert(collection_name=COLLECTION_NAME, points=points)
     print(f"✅ Stored {len(points)} vectors for {filename}")
 
-    return {
+    result = {
         "filename": filename,
+        "file_size_mb": round(len(file_content) / (1024 * 1024), 1),
         "chunks_count": len(filtered_chunks),
         "embeddings_count": len(embeddings),
         "vectors_stored": len(points),
         "gpu_device": embeddings_data["device"]
     }
+
+    # 리포트 업데이트
+    try:
+        update_processing_report(result)
+    except Exception as e:
+        print(f"⚠️ Report update failed: {e}")
+
+    return result
 
 
 # ==================== API 엔드포인트 ====================
