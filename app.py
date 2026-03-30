@@ -346,21 +346,28 @@ def update_processing_report(result: dict) -> None:
     print(f"📊 Report updated: {report_path}")
 
 
-async def process_pdf(file_content: bytes, filename: str) -> dict:
+async def process_pdf(file_content: bytes, filename: str, raw_markdown: str = None) -> dict:
     """
     단일 PDF 처리 파이프라인 (내부 공통 함수)
 
-    1. Gemini File API 변환
+    1. Gemini File API 변환 (raw_markdown이 이미 있으면 스킵)
     2. 노이즈 제거
     3. 목차 제거
     4. 청킹
     5. 청크 필터링
     6. GPU 임베딩
     7. Qdrant 저장 (기존 동일 파일 청크 교체)
+
+    raw_markdown 파라미터:
+    - None이면 Gemini File API로 직접 변환 (일반 처리)
+    - 값이 있으면 변환 스킵 (챕터 분할 처리에서 이미 변환된 결과물 전달용)
     """
-    # 1. Gemini 변환
-    print(f"Step 1/6: Converting {filename} with Gemini File API...")
-    raw_markdown = await convert_pdf_with_gemini(file_content, filename)
+    # 1. Gemini 변환 (외부에서 이미 변환된 경우 스킵)
+    if raw_markdown is None:
+        print(f"Step 1/6: Converting {filename} with Gemini File API...")
+        raw_markdown = await convert_pdf_with_gemini(file_content, filename)
+    else:
+        print(f"Step 1/6: Skipping Gemini conversion (pre-converted markdown provided)")
 
     # 변환 결과 markdown 파일로 저장 (품질 확인용)
     output_path = Path("/app/manual/output") / (Path(filename).stem + ".md")
@@ -523,6 +530,318 @@ async def convert_embed_store_batch(folder_path: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"배치 처리 중 오류: {str(e)}")
+
+
+@app.post("/parse-toc")
+async def parse_toc(file: UploadFile = File(...)):
+    """
+    PDF 목차 파싱 - 챕터/절/부록 단위 분할 계획 자동 생성
+
+    분할 전략:
+    1. 장(章) 단위로 파싱
+    2. 장 페이지 수가 100 초과하면 → 절(節) 단위 그리디 분할
+       - 절을 순서대로 누적하다가 100 초과하는 순간 직전까지 묶음 확정
+       - 다음 절부터 새 묶음 시작
+    3. 부록도 같은 그리디 로직 적용
+       - 부록1, 2, 3... 순서대로 누적하다가 100 초과하면 직전까지 묶음 확정
+
+    왜 그리디 방식이냐:
+    - 절/부록마다 페이지 수가 달라서 단순히 절반으로 나누면 불균형해짐
+    - 그리디로 누적하면 항상 100 이하로 유지되면서 최대한 크게 묶을 수 있음
+    - 나중에 문서 구조가 바뀌어도 자동으로 대응 가능
+    """
+    try:
+        from markitdown import MarkItDown
+        from pypdf import PdfReader
+
+        MAX_PAGES_PER_CHUNK = 100
+
+        content = await file.read()
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+
+        try:
+            reader = PdfReader(tmp_path)
+            total_pages = len(reader.pages)
+
+            md = MarkItDown()
+            result = md.convert(tmp_path)
+            raw_text = result.text_content
+
+            # ── 1. 장(章) 파싱 ──
+            chapter_pattern = re.compile(
+                r'제(\d+)장\s+([^\n·]+?)\s+[·\s·]+\s*(\d+)\s*$',
+                re.MULTILINE
+            )
+            chapters_raw = []
+            for match in chapter_pattern.finditer(raw_text):
+                chapters_raw.append({
+                    "chapter": int(match.group(1)),
+                    "title": match.group(2).strip(),
+                    "start_page": int(match.group(3))
+                })
+
+            # 중복 제거
+            seen = set()
+            chapters_raw = [
+                ch for ch in chapters_raw
+                if (ch["chapter"], ch["start_page"]) not in seen
+                and not seen.add((ch["chapter"], ch["start_page"]))
+            ]
+
+            # ── 2. 절(節) 파싱 ──
+            section_pattern = re.compile(
+                r'제(\d+)절\s+([^\n·]+?)\s+[·\s·]+\s*(\d+)\s*$',
+                re.MULTILINE
+            )
+            sections_raw = []
+            for match in section_pattern.finditer(raw_text):
+                sections_raw.append({
+                    "section": int(match.group(1)),
+                    "title": match.group(2).strip(),
+                    "start_page": int(match.group(3))
+                })
+
+            seen = set()
+            sections_raw = [
+                s for s in sections_raw
+                if (s["section"], s["start_page"]) not in seen
+                and not seen.add((s["section"], s["start_page"]))
+            ]
+
+            # ── 3. 부록 파싱 ──
+            appendix_pattern = re.compile(
+                r'^(\d+)\.\s+([^\n·]+?)\s+[·\s·]+\s*(\d+)\s*$',
+                re.MULTILINE
+            )
+            appendix_start = raw_text.find('[부록]')
+            appendix_items = []
+            if appendix_start != -1:
+                appendix_text = raw_text[appendix_start:]
+                for match in appendix_pattern.finditer(appendix_text):
+                    page = int(match.group(3))
+                    if page >= 300:  # 부록은 300페이지 이후
+                        appendix_items.append({
+                            "number": int(match.group(1)),
+                            "title": match.group(2).strip(),
+                            "start_page": page
+                        })
+
+            seen = set()
+            appendix_items = [
+                a for a in appendix_items
+                if a["start_page"] not in seen
+                and not seen.add(a["start_page"])
+            ]
+
+            # end_page 계산
+            for i, a in enumerate(appendix_items):
+                if i + 1 < len(appendix_items):
+                    a["end_page"] = appendix_items[i + 1]["start_page"] - 1
+                else:
+                    a["end_page"] = total_pages
+
+            # ── 4. 장 end_page 계산 (부록 시작 전까지) ──
+            appendix_first_page = appendix_items[0]["start_page"] if appendix_items else total_pages
+            for i, ch in enumerate(chapters_raw):
+                if i + 1 < len(chapters_raw):
+                    ch["end_page"] = chapters_raw[i + 1]["start_page"] - 1
+                else:
+                    ch["end_page"] = appendix_first_page - 1
+
+            # ── 5. 그리디 분할 적용 ──
+            def greedy_split(items, max_pages):
+                """
+                그리디 알고리즘으로 항목 묶기
+                - 누적 페이지가 max_pages 이하인 동안 계속 합치기
+                - max_pages 초과하는 순간 직전까지 묶음 확정, 새 묶음 시작
+                """
+                groups = []
+                current_group = []
+                current_pages = 0
+
+                for item in items:
+                    item_pages = item["end_page"] - item["start_page"] + 1
+
+                    if current_pages + item_pages > max_pages and current_group:
+                        # 현재 묶음 확정
+                        groups.append(current_group)
+                        current_group = [item]
+                        current_pages = item_pages
+                    else:
+                        current_group.append(item)
+                        current_pages += item_pages
+
+                if current_group:
+                    groups.append(current_group)
+
+                return groups
+
+            # 장 단위 처리
+            final_chunks = []
+            for ch in chapters_raw:
+                chapter_pages = ch["end_page"] - ch["start_page"] + 1
+
+                if chapter_pages <= MAX_PAGES_PER_CHUNK:
+                    # 100페이지 이하: 그대로
+                    final_chunks.append({
+                        "label": f"제{ch['chapter']}장",
+                        "title": ch["title"],
+                        "start_page": ch["start_page"],
+                        "end_page": ch["end_page"],
+                        "pages": chapter_pages
+                    })
+                else:
+                    # 100페이지 초과: 해당 장의 절들을 그리디 분할
+                    chapter_sections = [
+                        s for s in sections_raw
+                        if ch["start_page"] <= s["start_page"] <= ch["end_page"]
+                    ]
+
+                    # 절 end_page 계산
+                    for i, s in enumerate(chapter_sections):
+                        if i + 1 < len(chapter_sections):
+                            s["end_page"] = chapter_sections[i + 1]["start_page"] - 1
+                        else:
+                            s["end_page"] = ch["end_page"]
+
+                    if not chapter_sections:
+                        # 절 정보 없으면 그냥 챕터 통째로
+                        final_chunks.append({
+                            "label": f"제{ch['chapter']}장",
+                            "title": ch["title"],
+                            "start_page": ch["start_page"],
+                            "end_page": ch["end_page"],
+                            "pages": chapter_pages
+                        })
+                        continue
+
+                    groups = greedy_split(chapter_sections, MAX_PAGES_PER_CHUNK)
+                    for idx, group in enumerate(groups):
+                        final_chunks.append({
+                            "label": f"제{ch['chapter']}장-{idx+1}",
+                            "title": f"{ch['title']} ({group[0]['title']} ~ {group[-1]['title']})",
+                            "start_page": group[0]["start_page"],
+                            "end_page": group[-1]["end_page"],
+                            "pages": group[-1]["end_page"] - group[0]["start_page"] + 1
+                        })
+
+            # 부록 그리디 분할
+            if appendix_items:
+                appendix_groups = greedy_split(appendix_items, MAX_PAGES_PER_CHUNK)
+                for idx, group in enumerate(appendix_groups):
+                    final_chunks.append({
+                        "label": f"부록-{idx+1}",
+                        "title": f"부록 ({group[0]['title']} ~ {group[-1]['title']})",
+                        "start_page": group[0]["start_page"],
+                        "end_page": group[-1]["end_page"],
+                        "pages": group[-1]["end_page"] - group[0]["start_page"] + 1
+                    })
+
+            return {
+                "status": "success",
+                "filename": file.filename,
+                "total_pages": total_pages,
+                "total_chunks": len(final_chunks),
+                "chunks": final_chunks,
+                "note": "확인 후 /convert-by-chapters 에 chunks 그대로 전달하세요"
+            }
+
+        finally:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"목차 파싱 실패: {str(e)}")
+
+
+@app.post("/convert-by-chapters")
+async def convert_by_chapters(
+    file: UploadFile = File(...),
+    chunks: str = ""
+):
+    """
+    챕터 단위 분할 처리 - /parse-toc 결과를 받아서 Gemini 처리
+
+    Args:
+        file: PDF 파일
+        chunks: /parse-toc 결과의 chunks 배열 (JSON 문자열)
+                비어있으면 100페이지씩 자동 분할 (fallback)
+    """
+    try:
+        from pypdf import PdfReader, PdfWriter
+
+        content = await file.read()
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+
+        try:
+            reader = PdfReader(tmp_path)
+            total_pages = len(reader.pages)
+
+            # 청크 범위 결정
+            if chunks:
+                chunk_list = json.loads(chunks)
+                ranges = [
+                    (ch["start_page"] - 1, ch["end_page"], ch.get("label", f"chunk{i}"))
+                    for i, ch in enumerate(chunk_list)
+                ]
+            else:
+                print("⚠️ No chunks provided, splitting by 100 pages")
+                ranges = [
+                    (i, min(i + 100, total_pages), f"chunk{i//100+1}")
+                    for i in range(0, total_pages, 100)
+                ]
+
+            print(f"📄 Processing {len(ranges)} chunks for {file.filename}")
+
+            all_markdown = []
+            for i, (start, end, label) in enumerate(ranges):
+                print(f"🔄 Chunk {i+1}/{len(ranges)} [{label}]: pages {start+1}~{end}")
+
+                writer = PdfWriter()
+                for page_num in range(start, end):
+                    writer.add_page(reader.pages[page_num])
+
+                chunk_path = tmp_path + f"_chunk_{i}.pdf"
+                with open(chunk_path, 'wb') as f:
+                    writer.write(f)
+
+                try:
+                    chunk_content = open(chunk_path, 'rb').read()
+                    chunk_md = await convert_pdf_with_gemini(
+                        chunk_content,
+                        f"{file.filename}_{label}"
+                    )
+                    all_markdown.append(chunk_md)
+                    print(f"✅ Chunk {i+1} done: {len(chunk_md):,} chars")
+                finally:
+                    if os.path.exists(chunk_path):
+                        os.unlink(chunk_path)
+
+            combined_markdown = "\n\n".join(all_markdown)
+            print(f"✅ Combined: {len(combined_markdown):,} chars total")
+
+            result = await process_pdf(content, file.filename, raw_markdown=combined_markdown)
+            return {
+                "status": "success",
+                "filename": file.filename,
+                "total_pages": total_pages,
+                "chunks_processed": len(ranges),
+                "total_chars": len(combined_markdown),
+                **result
+            }
+
+        finally:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"챕터 분할 처리 실패: {str(e)}")
 
 
 @app.get("/stored-files")
