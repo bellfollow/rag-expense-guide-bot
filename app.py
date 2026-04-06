@@ -570,6 +570,27 @@ async def parse_toc(file: UploadFile = File(...)):
             result = md.convert(tmp_path)
             raw_text = result.text_content
 
+            # ── offset 자동 계산 ──
+            # MarkItDown 텍스트에서 "/ N /" 패턴 찾고
+            # pypdf로 실제 PDF 페이지와 대조해서 offset 계산
+            # offset = PDF 실제 페이지 - 문서상 페이지
+            offset = 0
+            page_marker_pattern = re.compile(r'[/\\]\s*(\d+)\s*[/\\]')
+            marker_match = page_marker_pattern.search(raw_text)
+            if marker_match:
+                doc_page = int(marker_match.group(1))
+                # pypdf 텍스트에서도 같은 패턴으로 찾기 (공백 차이 대응)
+                pdf_marker_pattern = re.compile(
+                    r'[/\\]\s*' + str(doc_page) + r'\s*[/\\]'
+                )
+                for i, page in enumerate(reader.pages):
+                    page_text = page.extract_text() or ""
+                    if pdf_marker_pattern.search(page_text):
+                        pdf_page = i + 1
+                        offset = pdf_page - doc_page
+                        print(f"📍 Offset 계산: 문서 {doc_page}p = PDF {pdf_page}p → offset={offset}")
+                        break
+
             # ── 1. 장(章) 파싱 ──
             chapter_pattern = re.compile(
                 r'제(\d+)장\s+([^\n·]+?)\s+[·\s·]+\s*(\d+)\s*$',
@@ -740,11 +761,18 @@ async def parse_toc(file: UploadFile = File(...)):
                         "pages": group[-1]["end_page"] - group[0]["start_page"] + 1
                     })
 
+            # ── offset 적용 ──
+            # 문서상 페이지 번호 → PDF 실제 페이지 번호로 변환
+            for chunk in final_chunks:
+                chunk["start_page"] = chunk["start_page"] + offset
+                chunk["end_page"] = min(chunk["end_page"] + offset, total_pages)
+
             return {
                 "status": "success",
                 "filename": file.filename,
                 "total_pages": total_pages,
                 "total_chunks": len(final_chunks),
+                "offset": offset,
                 "chunks": final_chunks,
                 "note": "확인 후 /convert-by-chapters 에 chunks 그대로 전달하세요"
             }
@@ -939,7 +967,7 @@ async def detect_noise_patterns(file: UploadFile = File(...)):
 
 
 @app.post("/test-gemini-parse")
-async def test_gemini_parse(file: UploadFile = File(...)):
+async def test_gemini_parse(file: UploadFile = File(...)): 
     """Gemini PDF 직접 파싱 테스트 (저장 없음, 품질 확인용)"""
     try:
         content = await file.read()
