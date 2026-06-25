@@ -2,7 +2,7 @@
 AI 사업비 집행 챗봇 - PDF 문서 처리 서버
 
 주요 기능:
-1. PDF → Markdown 변환 (Gemini 2.5 Flash-Lite, File API)
+1. PDF → Markdown 변환 (Gemini 3.1 Flash-Lite Preview, File API)
 2. 노이즈 제거 및 청킹 (구조 기반)
 3. GPU 임베딩 (워크스테이션 Jina v3)
 4. Qdrant 벡터 저장
@@ -16,12 +16,13 @@ PDF → Gemini File API → 노이즈 제거 → 청킹 → GPU 임베딩 → Qd
 최종 수정: 2026-03-19 (File API 전환, 배치 처리 추가)
 """
 
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 import re
 import requests
 import os
 import json
 import tempfile
+import uuid
 from pathlib import Path
 from datetime import datetime
 
@@ -44,7 +45,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "YOUR_API_KEY_HERE")
 genai.configure(api_key=GEMINI_API_KEY)
 
 GEMINI_MODEL = genai.GenerativeModel(
-    model_name='gemini-2.5-flash-lite',
+    model_name='gemini-3.1-flash-lite-preview',
     system_instruction="""
 # Role
 Expert in document data extraction and Markdown conversion.
@@ -158,6 +159,7 @@ def clean_markdown(raw_content: str) -> str:
     content = re.sub(r'\n{3,}', '\n\n', content)
     content = re.sub(r'[ \t]+$', '', content, flags=re.MULTILINE)
     content = content.replace('\u0000', '')
+    content = re.sub(r'(?<=[가-힣a-zA-Z0-9])\n(?=[가-힣a-zA-Z0-9])', ' ', content)  # 단어 중간 줄바꿈 제거
     return content.strip()
 
 
@@ -412,12 +414,9 @@ async def process_pdf(file_content: bytes, filename: str, raw_markdown: str = No
     except Exception:
         pass
 
-    existing = qdrant_client.scroll(collection_name=COLLECTION_NAME, limit=10000, with_payload=False)
-    max_id = max((p.id for p in existing[0]), default=-1)
-
     points = [
         PointStruct(
-            id=max_id + 1 + idx,
+            id=str(uuid.uuid4()),
             vector=embedding,
             payload={
                 "content": chunk,
@@ -530,6 +529,28 @@ async def convert_embed_store_batch(folder_path: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"배치 처리 중 오류: {str(e)}")
+
+
+@app.post("/embed-from-markdown")
+async def embed_from_markdown(filename: str):
+    """
+    이미 변환된 markdown 파일로 임베딩만 재실행
+    Gemini 호출 없이 청킹 → 임베딩 → Qdrant 저장
+
+    왜 이게 필요하냐:
+    - /convert-by-chapters가 Gemini 변환 완료 후 임베딩 단계에서 실패하면
+      Gemini를 다시 호출하지 않고 저장된 markdown으로 재시도 가능
+    - RPD 낭비 방지
+    """
+    md_path = Path("/app/manual/output") / (Path(filename).stem + ".md")
+    if not md_path.exists():
+        raise HTTPException(status_code=404, detail=f"Markdown 파일 없음: {md_path}")
+
+    raw_markdown = md_path.read_text(encoding="utf-8")
+    print(f"📄 Loading markdown: {md_path} ({len(raw_markdown):,} chars)")
+
+    result = await process_pdf(b"", filename, raw_markdown=raw_markdown)
+    return {"status": "success", **result}
 
 
 @app.post("/parse-toc")
@@ -788,7 +809,7 @@ async def parse_toc(file: UploadFile = File(...)):
 @app.post("/convert-by-chapters")
 async def convert_by_chapters(
     file: UploadFile = File(...),
-    chunks: str = ""
+    chunks: str = Form("")
 ):
     """
     챕터 단위 분할 처리 - /parse-toc 결과를 받아서 Gemini 처리
@@ -840,7 +861,8 @@ async def convert_by_chapters(
                     writer.write(f)
 
                 try:
-                    chunk_content = open(chunk_path, 'rb').read()
+                    with open(chunk_path, 'rb') as f:
+                        chunk_content = f.read()
                     chunk_md = await convert_pdf_with_gemini(
                         chunk_content,
                         f"{file.filename}_{label}"
@@ -942,7 +964,7 @@ async def detect_noise_patterns(file: UploadFile = File(...)):
 분석 대상:
 {sample}
 """
-        model = genai.GenerativeModel('gemini-2.5-flash-lite')
+        model = genai.GenerativeModel('gemini-3.1-flash-lite-preview')
         response = model.generate_content(prompt)
 
         response_text = response.text.strip()
@@ -967,7 +989,7 @@ async def detect_noise_patterns(file: UploadFile = File(...)):
 
 
 @app.post("/test-gemini-parse")
-async def test_gemini_parse(file: UploadFile = File(...)): 
+async def test_gemini_parse(file: UploadFile = File(...)):
     """Gemini PDF 직접 파싱 테스트 (저장 없음, 품질 확인용)"""
     try:
         content = await file.read()

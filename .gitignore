@@ -20,3 +20,4 @@ __pycache__/
 *.log
 mongo_error.txt
 my_project_tree.txt
+tree.py
