@@ -33,8 +33,16 @@ services:
       - "5000:5000"
     environment:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - JINA_API_KEY=${JINA_API_KEY}
+      - PYTHONUNBUFFERED=1
     volumes:
       - ./app.py:/app/app.py
+      - ./config.py:/app/config.py
+      - ./chunking.py:/app/chunking.py
+      - ./embeddings.py:/app/embeddings.py
+      - ./pipeline.py:/app/pipeline.py
+      - ./static:/app/static
+      - ./validate_conversion.py:/app/validate_conversion.py
       - ./manual:/app/manual
     depends_on:
       - mongodb

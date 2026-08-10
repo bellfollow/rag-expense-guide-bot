@@ -7,6 +7,18 @@ mongodb_data/
 # 백업
 backup/
 
+# 내부 문서 (분석/계획/핸드오프)
+docs/
+document/
+manual/
+.claude/
+HANDOFF.md
+.handoff_last_lines
+.agents/
+DEV_LOG.md
+tests/
+test_results/
+
 # 변환 결과물 및 PDF
 manual/output/
 manual/*.pdf

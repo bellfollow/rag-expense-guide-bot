@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 연구비 집행 챗봇</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
+    background: #f5f6fa;
+    color: #1a1a2e;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    background: #1a1a2e;
+    color: #fff;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  header h1 { font-size: 18px; font-weight: 600; }
+  header span { font-size: 13px; color: #8888aa; }
+
+  #chat-window {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .bubble {
+    max-width: 780px;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  .bubble.user {
+    display: flex;
+    justify-content: flex-end;
+  }
+  .bubble.user .text {
+    background: #1a1a2e;
+    color: #fff;
+    border-radius: 18px 18px 4px 18px;
+    padding: 12px 18px;
+    font-size: 15px;
+    max-width: 70%;
+  }
+
+  .bubble.bot .card {
+    background: #fff;
+    border-radius: 4px 18px 18px 18px;
+    padding: 20px 24px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+
+  .confidence {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+    margin-bottom: 14px;
+  }
+  .confidence.normal  { background: #e8f5e9; color: #2e7d32; }
+  .confidence.weak    { background: #fff8e1; color: #f57f17; }
+  .confidence.out     { background: #fce4ec; color: #c62828; }
+
+  .answer {
+    font-size: 15px;
+    line-height: 1.75;
+    color: #1a1a2e;
+  }
+  .answer h1,.answer h2,.answer h3 { margin: 14px 0 6px; font-size: 15px; }
+  .answer ul,.answer ol { padding-left: 20px; margin: 6px 0; }
+  .answer li { margin: 3px 0; }
+  .answer strong { color: #1a1a2e; }
+  .answer table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 13px; }
+  .answer th, .answer td { border: 1px solid #e0e0e0; padding: 6px 10px; text-align: left; }
+  .answer th { background: #f5f6fa; }
+
+  .sources {
+    margin-top: 16px;
+    border-top: 1px solid #f0f0f0;
+    padding-top: 12px;
+  }
+  .sources-title { font-size: 12px; color: #888; margin-bottom: 8px; font-weight: 600; letter-spacing: .04em; }
+  .source-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    color: #555;
+    padding: 4px 0;
+  }
+  .score-bar-wrap { width: 60px; height: 6px; background: #eee; border-radius: 3px; flex-shrink: 0; }
+  .score-bar { height: 100%; border-radius: 3px; }
+  .score-high  { background: #43a047; }
+  .score-mid   { background: #fb8c00; }
+  .score-low   { background: #e53935; }
+
+  .loading .dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #8888aa;
+    margin: 0 2px;
+    animation: bounce .9s infinite;
+  }
+  .loading .dot:nth-child(2) { animation-delay: .15s; }
+  .loading .dot:nth-child(3) { animation-delay: .3s; }
+  @keyframes bounce {
+    0%,80%,100% { transform: translateY(0); }
+    40%          { transform: translateY(-8px); }
+  }
+
+  #input-bar {
+    background: #fff;
+    border-top: 1px solid #e8e8e8;
+    padding: 16px 24px;
+    flex-shrink: 0;
+  }
+  #input-wrap {
+    max-width: 780px;
+    margin: 0 auto;
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+  }
+  #query {
+    flex: 1;
+    resize: none;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    padding: 12px 16px;
+    font-size: 15px;
+    font-family: inherit;
+    outline: none;
+    max-height: 120px;
+    overflow-y: auto;
+    transition: border-color .2s;
+  }
+  #query:focus { border-color: #1a1a2e; }
+  #send-btn {
+    background: #1a1a2e;
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    padding: 12px 22px;
+    font-size: 15px;
+    cursor: pointer;
+    font-family: inherit;
+    flex-shrink: 0;
+    transition: opacity .2s;
+  }
+  #send-btn:disabled { opacity: .4; cursor: default; }
+
+  .empty-hint {
+    text-align: center;
+    color: #bbb;
+    font-size: 14px;
+    margin: auto;
+    padding: 40px;
+  }
+  .empty-hint p { margin-top: 8px; }
+
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-left: auto;
+  }
+  .tab-btn {
+    background: transparent;
+    border: 1px solid #33335a;
+    color: #ccccdd;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background .15s;
+  }
+  .tab-btn.active { background: #fff; color: #1a1a2e; font-weight: 600; }
+
+  .panel { display: none; flex: 1; min-height: 0; flex-direction: column; }
+  .panel.active { display: flex; }
+
+  #receipt-panel { overflow-y: auto; padding: 24px; }
+  #receipt-form {
+    max-width: 560px;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  #receipt-form label { font-size: 13px; color: #555; display: block; margin-bottom: 8px; }
+  #receipt-file { display: block; margin-bottom: 14px; font-size: 14px; }
+  #receipt-preview { max-width: 100%; max-height: 200px; border-radius: 8px; margin-bottom: 14px; display: none; }
+  #classify-btn {
+    background: #1a1a2e; color: #fff; border: none; border-radius: 10px;
+    padding: 10px 20px; font-size: 14px; cursor: pointer; font-family: inherit;
+  }
+  #classify-btn:disabled { opacity: .4; cursor: default; }
+
+  #receipt-result { max-width: 560px; margin: 20px auto 0; }
+  .field-row { display: flex; justify-content: space-between; font-size: 14px; padding: 6px 0; border-bottom: 1px solid #f0f0f0; }
+  .field-row span:first-child { color: #888; }
+  .category-badge {
+    display: inline-block; font-size: 13px; font-weight: 600;
+    padding: 5px 12px; border-radius: 20px; margin: 12px 0 8px;
+  }
+  .category-badge.high   { background: #e8f5e9; color: #2e7d32; }
+  .category-badge.medium { background: #fff8e1; color: #f57f17; }
+  .category-badge.low    { background: #fce4ec; color: #c62828; }
+  .reasoning { font-size: 13px; color: #444; line-height: 1.6; margin-bottom: 8px; }
+  .citation { font-size: 12px; color: #888; font-style: italic; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>AI 연구비 집행 챗봇</h1>
+    <span>국가연구개발혁신법 매뉴얼 기반 · 문서 근거 답변만 제공</span>
+  </div>
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="chat">챗봇</button>
+    <button class="tab-btn" data-tab="receipt">영수증 분류</button>
+  </div>
+</header>
+
+<div id="chat-panel" class="panel active">
+  <div id="chat-window">
+    <div class="empty-hint">
+      <div style="font-size:32px">📄</div>
+      <p>연구비 집행 관련 궁금한 점을 질문하세요.</p>
+    </div>
+  </div>
+  <div id="input-bar">
+    <div id="input-wrap">
+      <textarea id="query" rows="1" placeholder="예: 연구활동비로 구입할 수 있는 항목은?"></textarea>
+      <button id="send-btn">전송</button>
+    </div>
+  </div>
+</div>
+
+<div id="receipt-panel" class="panel">
+  <div id="receipt-form">
+    <label>영수증/증빙 이미지 업로드</label>
+    <input type="file" id="receipt-file" accept="image/*,.pdf">
+    <img id="receipt-preview">
+    <button id="classify-btn">분류하기</button>
+  </div>
+  <div id="receipt-result"></div>
+</div>
+
+<script>
+const chatWindow = document.getElementById('chat-window');
+const queryEl    = document.getElementById('query');
+const sendBtn    = document.getElementById('send-btn');
+
+function confidenceInfo(sources) {
+  if (!sources || sources.length === 0)
+    return { cls: 'out', label: '⛔ 문서 범위 밖 질문일 수 있습니다' };
+  const max = Math.max(...sources.map(s => s.score));
+  if (max >= 0.55) return { cls: 'normal', label: '✅ 근거 문서 확인됨' };
+  if (max >= 0.45) return { cls: 'weak',   label: '⚠️ 근거가 약합니다. 담당자 확인 권장' };
+  return { cls: 'out', label: '⛔ 문서 범위 밖 질문일 수 있습니다' };
+}
+
+function scoreColor(score) {
+  if (score >= 0.55) return 'score-high';
+  if (score >= 0.45) return 'score-mid';
+  return 'score-low';
+}
+
+function appendUserBubble(text) {
+  const hint = chatWindow.querySelector('.empty-hint');
+  if (hint) hint.remove();
+
+  const div = document.createElement('div');
+  div.className = 'bubble user';
+  div.innerHTML = `<div class="text">${text.replace(/</g,'&lt;')}</div>`;
+  chatWindow.appendChild(div);
+  chatWindow.scrollTop = chatWindow.scrollHeight;
+}
+
+function appendLoading() {
+  const div = document.createElement('div');
+  div.className = 'bubble bot';
+  div.id = 'loading-bubble';
+  div.innerHTML = `<div class="card loading">
+    <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+  </div>`;
+  chatWindow.appendChild(div);
+  chatWindow.scrollTop = chatWindow.scrollHeight;
+  return div;
+}
+
+function replaceLoading(answer, sources) {
+  const loading = document.getElementById('loading-bubble');
+  if (!loading) return;
+
+  const conf = confidenceInfo(sources);
+
+  const sourcesHtml = (sources && sources.length > 0) ? `
+    <div class="sources">
+      <div class="sources-title">참고 출처</div>
+      ${sources.map(s => {
+        const pct = Math.round(s.score * 100);
+        return `<div class="source-item">
+          <div class="score-bar-wrap"><div class="score-bar ${scoreColor(s.score)}" style="width:${pct}%"></div></div>
+          <span>${pct}%</span>
+          <span>${s.source_file} ${s.title ? '· ' + s.title : ''}</span>
+        </div>`;
+      }).join('')}
+    </div>` : '';
+
+  loading.id = '';
+  loading.innerHTML = `<div class="card">
+    <div class="confidence ${conf.cls}">${conf.label}</div>
+    <div class="answer">${marked.parse(answer)}</div>
+    ${sourcesHtml}
+  </div>`;
+  chatWindow.scrollTop = chatWindow.scrollHeight;
+}
+
+async function sendQuery() {
+  const query = queryEl.value.trim();
+  if (!query) return;
+
+  sendBtn.disabled = true;
+  queryEl.value = '';
+  queryEl.style.height = 'auto';
+
+  appendUserBubble(query);
+  appendLoading();
+
+  try {
+    const fd = new FormData();
+    fd.append('query', query);
+    fd.append('top_k', '5');
+
+    const res  = await fetch('/chat', { method: 'POST', body: fd });
+    const data = await res.json();
+
+    if (!res.ok) {
+      replaceLoading(`오류가 발생했습니다: ${data.detail || res.status}`, []);
+    } else {
+      replaceLoading(data.answer, data.sources);
+    }
+  } catch (e) {
+    replaceLoading(`서버 연결 오류: ${e.message}`, []);
+  } finally {
+    sendBtn.disabled = false;
+    queryEl.focus();
+  }
+}
+
+sendBtn.addEventListener('click', sendQuery);
+queryEl.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendQuery(); }
+});
+queryEl.addEventListener('input', () => {
+  queryEl.style.height = 'auto';
+  queryEl.style.height = queryEl.scrollHeight + 'px';
+});
+
+// ── 탭 전환 ──────────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(`${btn.dataset.tab}-panel`).classList.add('active');
+  });
+});
+
+// ── 영수증 비목분류 ──────────────────────────────────────────
+const receiptFile    = document.getElementById('receipt-file');
+const receiptPreview = document.getElementById('receipt-preview');
+const classifyBtn    = document.getElementById('classify-btn');
+const receiptResult  = document.getElementById('receipt-result');
+
+receiptFile.addEventListener('change', () => {
+  const file = receiptFile.files[0];
+  if (file && file.type.startsWith('image/')) {
+    receiptPreview.src = URL.createObjectURL(file);
+    receiptPreview.style.display = 'block';
+  } else {
+    receiptPreview.style.display = 'none';
+  }
+});
+
+async function classifyReceipt() {
+  const file = receiptFile.files[0];
+  if (!file) return;
+
+  classifyBtn.disabled = true;
+  receiptResult.innerHTML = `<div class="card loading" style="max-width:560px;margin:0 auto;">
+    <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+  </div>`;
+
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+
+    const res  = await fetch('/classify-receipt', { method: 'POST', body: fd });
+    const data = await res.json();
+
+    if (!res.ok) {
+      receiptResult.innerHTML = `<div class="card">오류가 발생했습니다: ${data.detail || res.status}</div>`;
+      return;
+    }
+
+    const ex = data.extracted || {};
+    const cl = data.classification || {};
+    const co = data.compliance || {};
+    const sources = data.sources || [];
+
+    const flagCls = { '정상': 'high', '확인필요': 'medium', '지원불가': 'low' }[cl.flag] || 'medium';
+    const compCls = { '준수': 'high', '확인불가': 'medium', '위반의심': 'low' }[co.compliance_status] || 'medium';
+
+    const sourcesHtml = sources.length > 0 ? `
+      <div class="sources">
+        <div class="sources-title">참고 출처</div>
+        ${sources.map(s => {
+          const pct = Math.round(s.score * 100);
+          return `<div class="source-item">
+            <div class="score-bar-wrap"><div class="score-bar ${scoreColor(s.score)}" style="width:${pct}%"></div></div>
+            <span>${pct}%</span>
+            <span>${s.source_file} ${s.title ? '· ' + s.title : ''}</span>
+          </div>`;
+        }).join('')}
+      </div>` : '';
+
+    receiptResult.innerHTML = `<div class="card">
+      <div class="field-row"><span>상호</span><span>${ex.vendor ?? '-'}</span></div>
+      <div class="field-row"><span>항목</span><span>${ex.item ?? '-'}</span></div>
+      <div class="field-row"><span>금액</span><span>${ex.amount != null ? Number(ex.amount).toLocaleString() + '원' : '-'}</span></div>
+      <div class="field-row"><span>날짜</span><span>${ex.date ?? '-'}</span></div>
+
+      <div class="category-badge ${flagCls}">${cl.main_category || '판정 불가'} &gt; ${cl.sub_item || '-'} (${cl.flag || '-'})</div>
+      <div class="reasoning">${cl.reasoning || ''}</div>
+
+      <div class="category-badge ${compCls}">컴플라이언스: ${co.compliance_status || '확인불가'}</div>
+      <div class="reasoning">${co.compliance_notes || ''}</div>
+      <div class="citation">${co.citation ? '근거: ' + co.citation : ''}</div>
+      ${sourcesHtml}
+    </div>`;
+  } catch (e) {
+    receiptResult.innerHTML = `<div class="card">서버 연결 오류: ${e.message}</div>`;
+  } finally {
+    classifyBtn.disabled = false;
+  }
+}
+
+classifyBtn.addEventListener('click', classifyReceipt);
+</script>
+</body>
+</html>
