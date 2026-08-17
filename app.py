@@ -12,6 +12,7 @@ from chunking import detect_chunking_tier, extract_first_pages_text
 from embeddings import get_stored_files, init_collection
 from pipeline import chat as pipeline_chat
 from pipeline import classify_receipt as pipeline_classify_receipt
+from pipeline import review_settlement as pipeline_review_settlement
 from pipeline import convert_pdf_to_markdown, process_pdf
 
 app = FastAPI(title="AI 연구비 집행 챗봇 서버")
@@ -386,6 +387,21 @@ async def classify_receipt_endpoint(file: UploadFile = File(...)):
         raise HTTPException(status_code=502, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"영수증 분류 중 오류: {e}")
+
+
+@app.post("/review-settlement")
+async def review_settlement_endpoint(
+    files: list[UploadFile] = File(...),
+    total_budget: int | None = Form(None),
+):
+    try:
+        file_data = [(await f.read(), f.filename) for f in files]
+        result = await pipeline_review_settlement(file_data, total_budget)
+        return {"status": "success", **result}
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"정산보고서 검토 중 오류: {e}")
 
 
 # ── 탐지 / 디버그 ─────────────────────────────────────────────

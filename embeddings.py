@@ -4,7 +4,7 @@ from qdrant_client.models import (
     Distance, VectorParams, PointStruct,
     Filter, FieldCondition, MatchValue, FilterSelector,
 )
-from config import JINA_API_KEY, COLLECTION_NAME, VECTOR_DIM, qdrant_client
+from config import JINA_API_KEY, COLLECTION_NAME, VECTOR_DIM, qdrant_client, DEFAULT_DOC_TIER
 
 
 JINA_EMBED_URL = "https://api.jina.ai/v1/embeddings"
@@ -59,7 +59,8 @@ def delete_chunks_for_file(filename: str) -> None:
     print(f"🗑️ Deleted chunks for {filename}: {result}")
 
 
-def store_chunks(chunks: list[str], embeddings: list[list[float]], filename: str) -> int:
+def store_chunks(chunks: list[str], embeddings: list[list[float]], filename: str, doc_tier: dict | None = None) -> int:
+    doc_tier = doc_tier or DEFAULT_DOC_TIER
     points = [
         PointStruct(
             id=str(uuid.uuid4()),
@@ -69,6 +70,9 @@ def store_chunks(chunks: list[str], embeddings: list[list[float]], filename: str
                 "source_file": filename,
                 "chunk_index": idx,
                 "char_count": len(chunk),
+                "doc_tier": doc_tier["tier"],
+                "doc_tier_label": doc_tier["label"],
+                "doc_tier_rank": doc_tier["rank"],
             },
         )
         for idx, (chunk, embedding) in enumerate(zip(chunks, embeddings))
@@ -76,6 +80,20 @@ def store_chunks(chunks: list[str], embeddings: list[list[float]], filename: str
     qdrant_client.upsert(collection_name=COLLECTION_NAME, points=points)
     print(f"✅ Stored {len(points)} vectors for {filename}")
     return len(points)
+
+
+def set_doc_tier_for_file(filename: str, doc_tier: dict) -> None:
+    """재임베딩 없이 특정 파일의 기존 포인트에 doc_tier 계열 payload만 갱신."""
+    qdrant_client.set_payload(
+        collection_name=COLLECTION_NAME,
+        payload={
+            "doc_tier": doc_tier["tier"],
+            "doc_tier_label": doc_tier["label"],
+            "doc_tier_rank": doc_tier["rank"],
+        },
+        points=Filter(must=[FieldCondition(key="source_file", match=MatchValue(value=filename))]),
+    )
+    print(f"✅ doc_tier updated for {filename}: {doc_tier['label']}")
 
 
 def search(query_vector: list[float], top_k: int = 5) -> list:

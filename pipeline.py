@@ -9,9 +9,11 @@ import google.generativeai as genai
 from config import (
     GEMINI_CONVERT_MODEL, GEMINI_CHAT_MODEL, GEMINI_CONFIG, qdrant_client,
     GEMINI_RECEIPT_EXTRACT_MODEL, GEMINI_RECEIPT_CLASSIFY_MODEL, GEMINI_RECEIPT_COMPLIANCE_MODEL,
+    GEMINI_DOC_TIER_MODEL, DEFAULT_DOC_TIER, get_doc_tier_override, build_doc_tier,
+    SETTLEMENT_CAP_RULES,
 )
 from chunking import clean_markdown, select_and_chunk, filter_chunks, extract_section_title
-from embeddings import embed_texts, delete_chunks_for_file, store_chunks, search
+from embeddings import embed_texts, delete_chunks_for_file, store_chunks, search, get_stored_files, set_doc_tier_for_file
 
 RECEIPT_MIME_TYPES = {
     ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
@@ -72,6 +74,53 @@ async def convert_pdf_to_markdown(file_content: bytes, filename: str) -> tuple[s
                 pass
 
 
+# ── 문서 등급 자동 분류 ───────────────────────────────────────
+
+def classify_doc_tier(markdown_content: str, filename: str) -> dict:
+    """문서 앞부분 내용을 보고 법적 위계(법률/시행령/시행규칙/고시/지침 등)를 자동 판정.
+    수동 보정(DOCUMENT_TIER_OVERRIDE)이 있으면 그걸 우선 사용."""
+    override = get_doc_tier_override(filename)
+    if override:
+        return override
+
+    sample = markdown_content[:3000].strip()
+    if not sample:
+        return DEFAULT_DOC_TIER
+
+    prompt = f"[파일명]\n{filename}\n\n[문서 앞부분]\n{sample}\n\n[지시] 이 문서의 법적 위계를 판정하라."
+    try:
+        resp = GEMINI_DOC_TIER_MODEL.generate_content(prompt, generation_config=GEMINI_CONFIG)
+        result = json.loads(_strip_json_fence(resp.text))
+        tier = result.get("tier") or "기타"
+        doc_type = result.get("doc_type") or filename
+        print(f"📑 doc_tier 분류: {filename} → {tier} ({doc_type})")
+        return build_doc_tier(tier, doc_type)
+    except Exception as e:
+        print(f"⚠️ doc_tier 분류 실패({filename}): {e} — 기타(rank 99)로 폴백")
+        return DEFAULT_DOC_TIER
+
+
+async def reclassify_doc_tier(filename: str) -> dict:
+    """이미 임베딩된 문서를 재임베딩 없이 재분류. OUTPUT_DIR에 저장된 변환 마크다운을 재사용."""
+    md_path = OUTPUT_DIR / (Path(filename).stem + ".md")
+    if not md_path.exists():
+        raise RuntimeError(f"저장된 마크다운 없음: {md_path} (재변환 후 다시 시도)")
+    content = md_path.read_text(encoding="utf-8")
+    doc_tier = classify_doc_tier(content, filename)
+    set_doc_tier_for_file(filename, doc_tier)
+    return doc_tier
+
+
+async def reclassify_all_doc_tiers() -> dict:
+    results = {}
+    for filename in get_stored_files():
+        try:
+            results[filename] = await reclassify_doc_tier(filename)
+        except Exception as e:
+            results[filename] = {"error": str(e)}
+    return results
+
+
 # ── 핵심 파이프라인 ───────────────────────────────────────────
 
 async def process_pdf(file_content: bytes, filename: str, raw_markdown: str | None = None) -> dict:
@@ -95,20 +144,24 @@ async def process_pdf(file_content: bytes, filename: str, raw_markdown: str | No
         print(f"⚠️ Markdown save failed: {e}")
 
     # 2. 노이즈 제거
-    print("[2/4] Cleaning markdown...")
+    print("[2/5] Cleaning markdown...")
     clean_content = clean_markdown(raw_markdown)
 
-    # 3. 청킹 (Tier 2/3 자동 선택)
-    print("[3/4] Chunking...")
+    # 3. 문서 등급 자동 분류 (법률/시행령/시행규칙/고시/지침)
+    print("[3/5] Classifying doc tier...")
+    doc_tier = classify_doc_tier(clean_content, filename)
+
+    # 4. 청킹 (Tier 2/3 자동 선택)
+    print("[4/5] Chunking...")
     chunks, tier = select_and_chunk(clean_content)
     filtered = filter_chunks(chunks)
     print(f"  → {tier}: {len(chunks)} raw → {len(filtered)} filtered")
 
-    # 4. 임베딩 + 저장
-    print(f"[4/4] Embedding {len(filtered)} chunks via Jina cloud...")
+    # 5. 임베딩 + 저장
+    print(f"[5/5] Embedding {len(filtered)} chunks via Jina cloud...")
     vectors = embed_texts(filtered, task="retrieval.passage")
     delete_chunks_for_file(filename)
-    stored = store_chunks(filtered, vectors, filename)
+    stored = store_chunks(filtered, vectors, filename, doc_tier)
 
     result = {
         "filename": filename,
@@ -117,6 +170,8 @@ async def process_pdf(file_content: bytes, filename: str, raw_markdown: str | No
         "vectors_stored": stored,
         "chunking_tier": tier,
         "embed_model": "jina-embeddings-v3",
+        "doc_tier": doc_tier["tier"],
+        "doc_tier_label": doc_tier["label"],
     }
 
     try:
@@ -141,7 +196,7 @@ async def chat(query: str, top_k: int = 5) -> dict:
     for i, hit in enumerate(hits):
         p = hit.payload
         context_blocks.append(
-            f"[문서 {i+1}] (출처: {p['source_file']} / {p.get('title','')}, score={hit.score:.3f})\n"
+            f"[문서 {i+1}] (출처: {p['source_file']} [{p.get('doc_tier_label', '미분류 문서')}] / {p.get('title','')}, score={hit.score:.3f})\n"
             f"{p['content']}"
         )
         sources.append({
@@ -149,6 +204,8 @@ async def chat(query: str, top_k: int = 5) -> dict:
             "source_file": p["source_file"],
             "title": p.get("title", ""),
             "chunk_index": p.get("chunk_index"),
+            "doc_tier": p.get("doc_tier", "unknown"),
+            "doc_tier_label": p.get("doc_tier_label", "미분류 문서"),
         })
 
     context = "\n\n---\n\n".join(context_blocks)
@@ -212,7 +269,15 @@ async def classify_receipt(file_content: bytes, filename: str, top_k: int = 5) -
         raise RuntimeError(f"비목 판정 실패 (JSON 파싱 오류): {e}")
 
     # 3. 컴플라이언스 검토 (분류된 비목명으로 타겟 RAG 검색 — 법률용어 대 법률용어라 score 안정적)
-    search_query = f"{classification.get('main_category') or ''} {classification.get('sub_item') or ''} 사용기준".strip()
+    # flag=지원불가면 main_category/sub_item이 "해당없음"이라 그걸로 검색하면 무의미함 —
+    # 대신 지원불가 근거(금지 조항) 자체를 검색어로 써서 컴플라이언스 단계가 인용할 근거를 확보한다.
+    if classification.get("flag") == "지원불가":
+        search_query = "회의비 현물성 물품 구매 지급 불가 규정 제출서류 불인정기준"
+    else:
+        search_query = (
+            f"{classification.get('main_category') or ''} {classification.get('sub_item') or ''} "
+            "사용기준 제출서류 불인정기준"
+        ).strip()
     sources = []
     context = ""
     if search_query:
@@ -222,13 +287,15 @@ async def classify_receipt(file_content: bytes, filename: str, top_k: int = 5) -
         for i, hit in enumerate(hits):
             p = hit.payload
             context_blocks.append(
-                f"[문서 {i+1}] (출처: {p['source_file']} / {p.get('title','')}, score={hit.score:.3f})\n"
+                f"[문서 {i+1}] (출처: {p['source_file']} [{p.get('doc_tier_label', '미분류 문서')}] / {p.get('title','')}, score={hit.score:.3f})\n"
                 f"{p['content']}"
             )
             sources.append({
                 "score": round(hit.score, 4),
                 "source_file": p["source_file"],
                 "title": p.get("title", ""),
+                "doc_tier": p.get("doc_tier", "unknown"),
+                "doc_tier_label": p.get("doc_tier_label", "미분류 문서"),
             })
         context = "\n\n---\n\n".join(context_blocks)
 
@@ -252,6 +319,73 @@ async def classify_receipt(file_content: bytes, filename: str, top_k: int = 5) -
         "classification": classification,
         "compliance": compliance,
         "sources": sources,
+    }
+
+
+# ── 정산보고서 일괄 검토 ─────────────────────────────────────
+
+def _check_settlement_caps(category_totals: dict, sub_item_totals: dict, total_budget: int) -> list[dict]:
+    """SETTLEMENT_CAP_RULES 기준으로 비목별 계상비율 캡 초과 여부 검증."""
+    violations = []
+    for rule in SETTLEMENT_CAP_RULES:
+        source = sub_item_totals if rule["scope"] == "sub_item" else category_totals
+        amount = sum(source.get(k, 0) for k in rule["keys"])
+        ratio = amount / total_budget if total_budget else 0
+        exceeded = ratio < rule["ratio"] if rule["type"] == "min" else ratio > rule["ratio"]
+        if exceeded:
+            violations.append({
+                "rule": rule["label"],
+                "keys": rule["keys"],
+                "type": rule["type"],
+                "threshold_ratio": rule["ratio"],
+                "actual_ratio": round(ratio, 4),
+                "actual_amount": amount,
+            })
+    return violations
+
+
+async def review_settlement(files: list[tuple[bytes, str]], total_budget: int | None = None, top_k: int = 5) -> dict:
+    """정산보고서(영수증 여러 건) 일괄 검토. 각 영수증은 classify_receipt() 로직을 그대로 재사용.
+    total_budget 제공 시에만 비목별 계상비율 캡(SETTLEMENT_CAP_RULES) 검증."""
+    lines = []
+    failed = []
+    for content, filename in files:
+        try:
+            result = await classify_receipt(content, filename, top_k=top_k)
+            lines.append({"filename": filename, **result})
+        except RuntimeError as e:
+            failed.append({"filename": filename, "error": str(e)})
+
+    category_totals: dict[str, int] = {}
+    sub_item_totals: dict[str, int] = {}
+    for line in lines:
+        amount = line["extracted"].get("amount") or 0
+        main_category = line["classification"].get("main_category") or "해당없음"
+        sub_item = line["classification"].get("sub_item") or "해당없음"
+        category_totals[main_category] = category_totals.get(main_category, 0) + amount
+        sub_item_totals[sub_item] = sub_item_totals.get(sub_item, 0) + amount
+
+    cap_violations = []
+    if total_budget:
+        cap_violations = _check_settlement_caps(category_totals, sub_item_totals, total_budget)
+
+    flagged_count = sum(1 for line in lines if line["classification"].get("flag") == "지원불가")
+    violation_count = sum(1 for line in lines if line["compliance"].get("compliance_status") == "위반의심")
+
+    return {
+        "lines": lines,
+        "failed": failed,
+        "category_totals": category_totals,
+        "sub_item_totals": sub_item_totals,
+        "total_budget": total_budget,
+        "cap_violations": cap_violations,
+        "summary": {
+            "total_lines": len(lines),
+            "failed_lines": len(failed),
+            "flagged_disallowed": flagged_count,
+            "compliance_violations": violation_count,
+            "cap_violations": len(cap_violations),
+        },
     }
 
 
