@@ -378,10 +378,14 @@ async def chat_endpoint(query: str = Form(...), top_k: int = Form(5)):
 
 
 @app.post("/classify-receipt")
-async def classify_receipt_endpoint(file: UploadFile = File(...)):
+async def classify_receipt_endpoint(
+    file: UploadFile = File(...),
+    supporting_docs: list[UploadFile] = File(default=[]),
+):
     try:
         content = await file.read()
-        result = await pipeline_classify_receipt(content, file.filename)
+        docs = [(await f.read(), f.filename) for f in supporting_docs if f.filename]
+        result = await pipeline_classify_receipt(content, file.filename, supporting_docs=docs or None)
         return {"status": "success", **result}
     except RuntimeError as e:
         raise HTTPException(status_code=502, detail=str(e))

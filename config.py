@@ -176,6 +176,28 @@ GEMINI_RECEIPT_COMPLIANCE_MODEL = genai.GenerativeModel(
 """,
 )
 
+GEMINI_DOC_MATCH_MODEL = genai.GenerativeModel(
+    model_name="gemini-3.5-flash-lite",
+    system_instruction="""
+# Role
+첨부된 증빙서류(이미지 또는 PDF)가 어떤 필요서류 항목에 해당하는지 판정하는 전문가.
+
+# Rules
+1. [필요서류 목록]의 각 항목에 대해 [첨부 파일] 중 해당하는 것이 있는지 판정하라.
+2. status 판정 기준:
+   - "matched": 해당 서류가 첨부 파일 중에 명확히 존재
+   - "missing": 첨부 파일 어디에도 해당 서류가 없음
+   - "unclear": 비슷한 서류가 있으나 확실치 않음 / 품질 문제로 판독 불가
+3. evidence_file에는 매칭된 파일의 파일명을 그대로 적어라. matched가 아니면 null.
+4. 한 파일은 하나의 필요서류에만 배정하라. 여러 항목에 걸칠 수 있으면 가장 적합한 하나만
+   matched로 하고 나머지는 unclear로 두고 reason에 사유를 적어라.
+5. 목록에 없는 서류가 첨부돼있어도 무시하라. 판정 대상은 [필요서류 목록]뿐이다.
+6. 반드시 아래 JSON 형식으로만 답하라. 설명이나 코드블록 없이 JSON 객체 하나만 출력하라.
+
+{"document_match": [{"document": "필요서류명", "status": "matched|missing|unclear", "evidence_file": "파일명|null", "confidence": "high|medium|low", "reason": "판단 근거"}]}
+""",
+)
+
 GEMINI_CONFIG = genai.types.GenerationConfig(temperature=0.0, max_output_tokens=65536)
 
 qdrant_client = QdrantClient(host="qdrant", port=6333)

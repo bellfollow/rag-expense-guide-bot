@@ -227,6 +227,18 @@
   .category-badge.low    { background: #fce4ec; color: #c62828; }
   .reasoning { font-size: 13px; color: #444; line-height: 1.6; margin-bottom: 8px; }
   .citation { font-size: 12px; color: #888; font-style: italic; }
+
+  #supporting-docs { display: block; margin-bottom: 14px; font-size: 13px; }
+
+  .doc-section { margin-top: 16px; border-top: 1px solid #f0f0f0; padding-top: 12px; }
+  .doc-section-title { font-size: 12px; color: #888; margin-bottom: 8px; font-weight: 600; letter-spacing: .04em; }
+  .doc-item { font-size: 13px; padding: 6px 0; border-bottom: 1px solid #f5f5f5; }
+  .doc-item:last-child { border-bottom: none; }
+  .doc-status { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; margin-right: 8px; }
+  .doc-status.high   { background: #e8f5e9; color: #2e7d32; }
+  .doc-status.medium { background: #fff8e1; color: #f57f17; }
+  .doc-status.low    { background: #fce4ec; color: #c62828; }
+  .doc-meta { font-size: 11px; color: #999; margin-top: 2px; }
 </style>
 </head>
 <body>
@@ -262,6 +274,8 @@
     <label>영수증/증빙 이미지 업로드</label>
     <input type="file" id="receipt-file" accept="image/*,.pdf">
     <img id="receipt-preview">
+    <label>증빙서류 첨부 (선택, 여러 장 가능 — 출장신청서/카드매출전표 등)</label>
+    <input type="file" id="supporting-docs" accept="image/*,.pdf" multiple>
     <button id="classify-btn">분류하기</button>
   </div>
   <div id="receipt-result"></div>
@@ -390,10 +404,11 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 });
 
 // ── 영수증 비목분류 ──────────────────────────────────────────
-const receiptFile    = document.getElementById('receipt-file');
-const receiptPreview = document.getElementById('receipt-preview');
-const classifyBtn    = document.getElementById('classify-btn');
-const receiptResult  = document.getElementById('receipt-result');
+const receiptFile     = document.getElementById('receipt-file');
+const receiptPreview  = document.getElementById('receipt-preview');
+const supportingDocs  = document.getElementById('supporting-docs');
+const classifyBtn     = document.getElementById('classify-btn');
+const receiptResult   = document.getElementById('receipt-result');
 
 receiptFile.addEventListener('change', () => {
   const file = receiptFile.files[0];
@@ -417,6 +432,9 @@ async function classifyReceipt() {
   try {
     const fd = new FormData();
     fd.append('file', file);
+    if (supportingDocs.files.length > 0) {
+      for (const f of supportingDocs.files) fd.append('supporting_docs', f);
+    }
 
     const res  = await fetch('/classify-receipt', { method: 'POST', body: fd });
     const data = await res.json();
@@ -447,6 +465,25 @@ async function classifyReceipt() {
         }).join('')}
       </div>` : '';
 
+    const reqDocs = co.required_documents || [];
+    const reqDocsHtml = reqDocs.length > 0 ? `
+      <div class="doc-section">
+        <div class="doc-section-title">필요서류</div>
+        ${reqDocs.map(d => `<div class="doc-item">${d}</div>`).join('')}
+      </div>` : '';
+
+    const docMatchStatusCls = { matched: 'high', unclear: 'medium', missing: 'low' };
+    const docMatch = co.document_match || [];
+    const docMatchHtml = docMatch.length > 0 ? `
+      <div class="doc-section">
+        <div class="doc-section-title">증빙서류 대조 결과</div>
+        ${docMatch.map(m => `<div class="doc-item">
+          <span class="doc-status ${docMatchStatusCls[m.status] || 'medium'}">${m.status || '-'}</span>${m.document || ''}
+          ${m.evidence_file ? `<div class="doc-meta">첨부: ${m.evidence_file}</div>` : ''}
+          ${m.reason ? `<div class="doc-meta">${m.reason}</div>` : ''}
+        </div>`).join('')}
+      </div>` : '';
+
     receiptResult.innerHTML = `<div class="card">
       <div class="field-row"><span>상호</span><span>${ex.vendor ?? '-'}</span></div>
       <div class="field-row"><span>항목</span><span>${ex.item ?? '-'}</span></div>
@@ -459,6 +496,8 @@ async function classifyReceipt() {
       <div class="category-badge ${compCls}">컴플라이언스: ${co.compliance_status || '확인불가'}</div>
       <div class="reasoning">${co.compliance_notes || ''}</div>
       <div class="citation">${co.citation ? '근거: ' + co.citation : ''}</div>
+      ${reqDocsHtml}
+      ${docMatchHtml}
       ${sourcesHtml}
     </div>`;
   } catch (e) {

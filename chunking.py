@@ -4,6 +4,7 @@ import tempfile
 
 MAX_CHUNK_SIZE = 1500
 MIN_CHUNK_SIZE = 300
+TABLE_MAX = 6000  # 표는 이 길이까지 안 자름. guiideline 최대 표(1733자)의 3배 여유.
 
 
 # ── 노이즈 제거 ──────────────────────────────────────────────
@@ -48,6 +49,14 @@ def extract_section_title(chunk: str) -> str:
 
 def _split_long_paragraph(para: str, max_size: int) -> list[str]:
     return [para[i:i + max_size] for i in range(0, len(para), max_size)]
+
+
+def _is_markdown_table(text: str) -> bool:
+    lines = [l for l in text.split('\n') if l.strip()]
+    if len(lines) < 2:
+        return False
+    pipe_lines = sum(1 for l in lines if l.strip().startswith('|'))
+    return pipe_lines / len(lines) > 0.5
 
 
 def _is_vertical_table_line(line: str) -> bool:
@@ -122,7 +131,14 @@ def chunk_by_size(content: str, max_chunk_size: int = MAX_CHUNK_SIZE) -> list[st
                 if cur.strip():
                     chunks.append(cur.strip())
                     cur = ""
-                chunks.extend(_split_long_paragraph(para, max_chunk_size))
+                if _is_markdown_table(para):
+                    if len(para) <= TABLE_MAX:
+                        chunks.append(para)
+                    else:
+                        print(f"⚠️ 표가 TABLE_MAX({TABLE_MAX}자) 초과 — 강제 슬라이스로 폴백 (길이={len(para)})")
+                        chunks.extend(_split_long_paragraph(para, max_chunk_size))
+                else:
+                    chunks.extend(_split_long_paragraph(para, max_chunk_size))
                 continue
             if len(cur) + len(para) < max_chunk_size:
                 cur += para + "\n\n"
@@ -195,7 +211,14 @@ def chunk_by_markdown_heading(
             else:
                 if sub:
                     final.append(sub)
-                final.extend(part[i:i + max_chunk_size] for i in range(0, len(part), max_chunk_size))
+                if _is_markdown_table(part):
+                    if len(part) <= TABLE_MAX:
+                        final.append(part)
+                    else:
+                        print(f"⚠️ 표가 TABLE_MAX({TABLE_MAX}자) 초과 — 강제 슬라이스로 폴백 (길이={len(part)})")
+                        final.extend(part[i:i + max_chunk_size] for i in range(0, len(part), max_chunk_size))
+                else:
+                    final.extend(part[i:i + max_chunk_size] for i in range(0, len(part), max_chunk_size))
                 sub = ""
         if sub:
             final.append(sub)

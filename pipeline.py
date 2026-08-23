@@ -9,6 +9,7 @@ import google.generativeai as genai
 from config import (
     GEMINI_CONVERT_MODEL, GEMINI_CHAT_MODEL, GEMINI_CONFIG, qdrant_client,
     GEMINI_RECEIPT_EXTRACT_MODEL, GEMINI_RECEIPT_CLASSIFY_MODEL, GEMINI_RECEIPT_COMPLIANCE_MODEL,
+    GEMINI_DOC_MATCH_MODEL,
     GEMINI_DOC_TIER_MODEL, DEFAULT_DOC_TIER, get_doc_tier_override, build_doc_tier,
     SETTLEMENT_CAP_RULES,
 )
@@ -30,6 +31,18 @@ def _strip_json_fence(text: str) -> str:
     return text.strip()
 
 OUTPUT_DIR = Path("/app/manual/output")
+
+
+def _log_raw_response(stage: str, text: str) -> None:
+    """LLM 응답 원문을 파일로 남긴다 — 파싱 실패 시 모델이 틀렸는지 파서가 틀렸는지 구분하기 위함.
+    로깅 실패가 기능을 막으면 안 되므로 예외는 전부 무시한다."""
+    try:
+        log_dir = OUTPUT_DIR / "raw_responses"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        (log_dir / f"{timestamp}_{stage}.txt").write_text(text, encoding="utf-8")
+    except Exception:
+        pass
 
 
 # ── PDF → Markdown ───────────────────────────────────────────
@@ -220,7 +233,74 @@ async def chat(query: str, top_k: int = 5) -> dict:
 
 # ── 영수증 비목분류 ──────────────────────────────────────────
 
-async def classify_receipt(file_content: bytes, filename: str, top_k: int = 5) -> dict:
+async def _match_supporting_documents(
+    required_documents: list[str],
+    supporting_docs: list[tuple[bytes, str]] | None,
+) -> list[dict]:
+    """필요서류 목록과 첨부 증빙파일들을 LLM 1회 호출로 대조한다(M×N 루프 금지 — 모델이
+    전체를 보고 배타적으로 배정하게 함). supporting_docs 없으면 매칭 자체를 스킵([]),
+    required_documents가 없으면 그와 구분되는 별도 신호("(필요서류 목록 없음)" 1건)를 반환한다."""
+    if not supporting_docs:
+        return []
+
+    if not required_documents:
+        return [{
+            "document": "(필요서류 목록 없음)",
+            "status": "unclear",
+            "evidence_file": None,
+            "confidence": "low",
+            "reason": "컴플라이언스 단계가 필요서류를 특정하지 못해 매칭을 수행할 수 없음",
+        }]
+
+    tmp_paths = []
+    uploaded_files = []
+    try:
+        file_parts = []
+        filename_lines = []
+        for i, (content, filename) in enumerate(supporting_docs):
+            suffix = Path(filename).suffix.lower() or ".jpg"
+            mime_type = RECEIPT_MIME_TYPES.get(suffix, "image/jpeg")
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                tmp.write(content)
+                tmp_paths.append(tmp.name)
+            uploaded = genai.upload_file(tmp.name, mime_type=mime_type)
+            uploaded_files.append(uploaded)
+            file_parts.append(uploaded)
+            filename_lines.append(f"{i+1}. {filename}")
+
+        match_prompt = (
+            "[필요서류 목록]\n" + "\n".join(f"- {d}" for d in required_documents) + "\n\n"
+            "[첨부 파일]\n" + "\n".join(filename_lines) + "\n\n"
+            "[지시] 위 필요서류 각각에 대해 첨부 파일 중 해당하는 것을 판정하라."
+        )
+        match_resp = GEMINI_DOC_MATCH_MODEL.generate_content(
+            [*file_parts, match_prompt], generation_config=GEMINI_CONFIG,
+        )
+        _log_raw_response("doc_match", match_resp.text)
+        parsed = json.loads(_strip_json_fence(match_resp.text))
+        if "document_match" not in parsed:
+            raise ValueError("document_match 키 없음")
+        return parsed["document_match"]
+    except Exception as e:
+        return [{
+            "document": d, "status": "unclear", "evidence_file": None,
+            "confidence": "low", "reason": f"증빙서류 매칭 처리 중 오류: {e}",
+        } for d in required_documents]
+    finally:
+        for p in tmp_paths:
+            if os.path.exists(p):
+                os.unlink(p)
+        for uploaded in uploaded_files:
+            try:
+                genai.delete_file(uploaded.name)
+            except Exception:
+                pass
+
+
+async def classify_receipt(
+    file_content: bytes, filename: str, top_k: int = 5,
+    supporting_docs: list[tuple[bytes, str]] | None = None,
+) -> dict:
     suffix = Path(filename).suffix.lower() or ".jpg"
     mime_type = RECEIPT_MIME_TYPES.get(suffix, "image/jpeg")
 
@@ -271,18 +351,27 @@ async def classify_receipt(file_content: bytes, filename: str, top_k: int = 5) -
     # 3. 컴플라이언스 검토 (분류된 비목명으로 타겟 RAG 검색 — 법률용어 대 법률용어라 score 안정적)
     # flag=지원불가면 main_category/sub_item이 "해당없음"이라 그걸로 검색하면 무의미함 —
     # 대신 지원불가 근거(금지 조항) 자체를 검색어로 써서 컴플라이언스 단계가 인용할 근거를 확보한다.
+    # "한도/사용기준"과 "제출서류"를 한 쿼리에 섞으면 그 두 단어가 각자 다른 참고표(불인정기준 표 vs
+    # 제출서류 표)를 무관하게 끌어올려서 서로를 오염시킨다 — 목적별로 분리해 검색한다.
     if classification.get("flag") == "지원불가":
-        search_query = "회의비 현물성 물품 구매 지급 불가 규정 제출서류 불인정기준"
+        queries = ["회의비 현물성 물품 구매 지급 불가 불인정기준"]
     else:
-        search_query = (
-            f"{classification.get('main_category') or ''} {classification.get('sub_item') or ''} "
-            "사용기준 제출서류 불인정기준"
-        ).strip()
+        sub_item = classification.get('sub_item') or ''
+        queries = [
+            f"{sub_item} 한도 사용기준",
+            f"{sub_item} 제출서류",
+        ]
     sources = []
     context = ""
-    if search_query:
-        query_vector = embed_texts([search_query], task="retrieval.query")[0]
-        hits = search(query_vector, top_k=top_k)
+    if any(queries):
+        per_query_k = -(-top_k // len(queries)) + 1  # 올림 나눗셈 — 쿼리 개수(1개/2개)에 맞춰 스케일
+        seen = {}
+        for q in queries:
+            query_vector = embed_texts([q], task="retrieval.query")[0]
+            for hit in search(query_vector, top_k=per_query_k):
+                if hit.id not in seen or hit.score > seen[hit.id].score:
+                    seen[hit.id] = hit
+        hits = sorted(seen.values(), key=lambda h: h.score, reverse=True)[:top_k]
         context_blocks = []
         for i, hit in enumerate(hits):
             p = hit.payload
@@ -313,6 +402,11 @@ async def classify_receipt(file_content: bytes, filename: str, top_k: int = 5) -
         compliance = json.loads(_strip_json_fence(compliance_resp.text))
     except (json.JSONDecodeError, ValueError) as e:
         raise RuntimeError(f"컴플라이언스 검토 실패 (JSON 파싱 오류): {e}")
+
+    # 4. 증빙서류 첨부 여부 매칭 (supporting_docs 있을 때만 수행)
+    compliance["document_match"] = await _match_supporting_documents(
+        compliance.get("required_documents") or [], supporting_docs
+    )
 
     return {
         "extracted": extracted,
