@@ -11,7 +11,7 @@ from config import (
     GEMINI_RECEIPT_EXTRACT_MODEL, GEMINI_RECEIPT_CLASSIFY_MODEL, GEMINI_RECEIPT_COMPLIANCE_MODEL,
     GEMINI_DOC_MATCH_MODEL,
     GEMINI_DOC_TIER_MODEL, DEFAULT_DOC_TIER, get_doc_tier_override, build_doc_tier,
-    SETTLEMENT_CAP_RULES,
+    SETTLEMENT_CAP_RULES, ABSOLUTE_CAP_RULES, PROHIBITION_MARKERS,
 )
 from chunking import clean_markdown, select_and_chunk, filter_chunks, extract_section_title
 from embeddings import embed_texts, delete_chunks_for_file, store_chunks, search, get_stored_files, set_doc_tier_for_file
@@ -297,6 +297,54 @@ async def _match_supporting_documents(
                 pass
 
 
+def check_absolute_cap(
+    sub_item: str, amount: int | float,
+    grade: str | None = None, region: str | None = None, days: int = 1,
+) -> dict:
+    """ABSOLUTE_CAP_RULES 기준 결정론적 절대금액 판정. LLM에 묻지 않는다 — 금액 오독은 치명적.
+    sub_item이 등록된 규칙 어느 것과도 정확히 일치하지 않으면(세부항목 불명확 포함) unknown을
+    반환한다 — 모르면 모른다고 하지, 아무 규칙이나 들이대 오탐을 만들지 않는다.
+    grade가 grade_dependent 규칙에서 None이면 가장 관대한 등급(rule["default_grade"])으로
+    판정한다 — false negative는 감수하되 false positive는 만들지 않기 위함.
+    region은 현재 구현된 규칙(#2/#3/#6/#7) 중 쓰는 게 없다(지역별 캡인 #8 숙박비는 미구현,
+    이유는 ABSOLUTE_CAP_RULES 옆 주석 참고) — 향후 규칙 확장 대비 시그니처만 유지."""
+    rule = next((r for r in ABSOLUTE_CAP_RULES if sub_item in r["sub_items"]), None)
+    if rule is None:
+        return {
+            "status": "unknown", "rule": None, "limit": None, "actual": amount,
+            "reason": f"'{sub_item}'에 대한 절대금액 규칙 없음(미구현이거나 세부항목 특정 불가)",
+            "citation": None,
+        }
+
+    if rule["grade_dependent"]:
+        g = grade or rule["default_grade"]
+        if g not in rule["limits"]:
+            return {
+                "status": "unknown", "rule": rule["label"], "limit": None, "actual": amount,
+                "reason": f"등급 값 '{g}'이 이 규칙의 등급 구간({list(rule['limits'])})에 없음",
+                "citation": f"{rule['source']['location']} — \"{rule['source']['quote']}\"",
+            }
+        limit = rule["limits"][g]
+    else:
+        limit = rule["limits"]["ALL"]
+
+    if rule["unit"] in ("1일", "1박"):
+        limit = limit * max(days or 1, 1)
+
+    citation = f"{rule['source']['location']} — \"{rule['source']['quote']}\""
+    if rule["type"] == "금지형":
+        status = "violation" if amount > limit else "ok"
+        reason = f"{rule['label']} {limit:,.0f}원 {'초과' if status == 'violation' else '이내'} — 실제 {amount:,.0f}원"
+    else:  # 절차형
+        status = "review" if amount >= limit else "ok"
+        reason = f"{rule['label']} {limit:,.0f}원 {'이상 — 심의위원회 회부 대상' if status == 'review' else '미만'} — 실제 {amount:,.0f}원"
+
+    return {
+        "status": status, "rule": rule["label"], "limit": limit, "actual": amount,
+        "reason": reason, "citation": citation,
+    }
+
+
 async def classify_receipt(
     file_content: bytes, filename: str, top_k: int = 5,
     supporting_docs: list[tuple[bytes, str]] | None = None,
@@ -402,6 +450,32 @@ async def classify_receipt(
         compliance = json.loads(_strip_json_fence(compliance_resp.text))
     except (json.JSONDecodeError, ValueError) as e:
         raise RuntimeError(f"컴플라이언스 검토 실패 (JSON 파싱 오류): {e}")
+
+    # 2-1. 컴플라이언스가 발견한 명시적 금지를 분류 단계로 역전파(override)
+    # LLM이 "제출서류 표" 등을 금지 조항으로 오인해 override를 낼 수 있어(r011 사례),
+    # citation에 PROHIBITION_MARKERS가 실제로 있을 때만 인정한다 — 문자열 검사는
+    # LLM 판단이 아니라 코드로 확정할 수 있는 사실이므로 게이트한다.
+    if compliance.get("override_flag") == "지원불가":
+        citation = compliance.get("citation") or ""
+        if any(marker in citation for marker in PROHIBITION_MARKERS):
+            classification["flag_before_override"] = classification.get("flag")
+            classification["override_reason"] = citation
+            classification["flag"] = "지원불가"
+            classification["main_category"] = "해당없음"
+            classification["sub_item"] = "해당없음"
+        else:
+            compliance["override_rejected"] = f"citation에 금지 표현 없음 — 게이트 차단: {citation!r}"
+            if compliance.get("compliance_status") == "위반의심":
+                compliance["status_before_gate"] = compliance["compliance_status"]
+                compliance["compliance_status"] = "확인불가"
+
+    # 3-1. 절대금액 캡 결정론적 판정 (LLM 판단과 별개 — 금액은 코드가 직접 계산)
+    # grade/region은 현재 추출 단계가 뽑지 않으므로 항상 None으로 넘긴다 — LLM에게
+    # 추론시키지 않고, 없는 채로 보수적으로(가장 관대한 등급 기본값) 판정한다.
+    compliance["absolute_cap"] = check_absolute_cap(
+        sub_item=classification.get("sub_item") or "",
+        amount=extracted.get("amount") or 0,
+    )
 
     # 4. 증빙서류 첨부 여부 매칭 (supporting_docs 있을 때만 수행)
     compliance["document_match"] = await _match_supporting_documents(
