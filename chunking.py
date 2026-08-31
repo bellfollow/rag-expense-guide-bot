@@ -157,6 +157,7 @@ def chunk_by_markdown_heading(
     content: str,
     min_chunk_size: int = MIN_CHUNK_SIZE,
     max_chunk_size: int = MAX_CHUNK_SIZE,
+    split_at_level: int | None = None,
 ) -> list[str]:
     heading_re = re.compile(r'^(#{1,6})\s+(.+)$', re.MULTILINE)
     boundaries = [
@@ -181,16 +182,19 @@ def chunk_by_markdown_heading(
         stack.append(title)
         breadcrumb = ' > '.join(stack[:-1]) if len(stack) > 1 else ''
         prefix = f"[{breadcrumb}] {title}\n" if breadcrumb else f"{title}\n"
-        raw_chunks.append(prefix + body)
+        raw_chunks.append((level, prefix + body))
 
     # size-pack
     packed: list[str] = []
     buffer = ""
-    for chunk in raw_chunks:
+    for level, chunk in raw_chunks:
         if not buffer:
             buffer = chunk
             continue
-        if len(buffer) < min_chunk_size or len(buffer) + len(chunk) <= max_chunk_size:
+        if split_at_level is not None and level <= split_at_level:
+            packed.append(buffer)
+            buffer = chunk
+        elif len(buffer) < min_chunk_size or len(buffer) + len(chunk) <= max_chunk_size:
             buffer += "\n\n" + chunk
         else:
             packed.append(buffer)
@@ -267,7 +271,7 @@ def detect_chunking_tier(pdf_path: str) -> tuple[int, str]:
         return 2, f"TOC detection failed ({e}) — fallback to heading-based"
 
 
-def select_and_chunk(markdown: str) -> tuple[list[str], str]:
+def select_and_chunk(markdown: str, split_at_level: int | None = None) -> tuple[list[str], str]:
     if detect_heading_structure(markdown):
-        return chunk_by_markdown_heading(markdown), "tier2-heading"
+        return chunk_by_markdown_heading(markdown, split_at_level=split_at_level), "tier2-heading"
     return chunk_by_size(markdown), "tier3-size"

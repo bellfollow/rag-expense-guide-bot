@@ -166,7 +166,8 @@ async def process_pdf(file_content: bytes, filename: str, raw_markdown: str | No
 
     # 4. 청킹 (Tier 2/3 자동 선택)
     print("[4/5] Chunking...")
-    chunks, tier = select_and_chunk(clean_content)
+    split_at_level = 3 if filename == "guiideline.pdf" else None
+    chunks, tier = select_and_chunk(clean_content, split_at_level=split_at_level)
     filtered = filter_chunks(chunks)
     print(f"  → {tier}: {len(chunks)} raw → {len(filtered)} filtered")
 
