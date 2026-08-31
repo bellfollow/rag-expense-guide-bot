@@ -68,6 +68,7 @@ def run(api, index, labels, out):
             else:
                 d = r.json()
                 rec["got"] = {
+                    "is_receipt": d["extracted"].get("is_receipt"),
                     "amount": d["extracted"].get("amount"),
                     "date": d["extracted"].get("date"),
                     "vendor": d["extracted"].get("vendor"),
@@ -110,7 +111,14 @@ def score(out, report):
     n = len(ok)
     if not n:
         print("성공 0건 — 전부 실패"); return
-    L = [f"# 평가 결과 ({n}/{len(rows)}건 성공)\n", "## 단계별 정확도\n", "| 항목 | 정확도 |", "|---|---|"]
+    L = [f"# 평가 결과 ({n}/{len(rows)}건 성공)\n"]
+    fp = [r for r in ok if r["got"].get("is_receipt") is False]
+    if fp:
+        L.append(f"## 🚨 is_receipt 오탐 {len(fp)}건 — 실제 영수증을 비영수증으로 거절함\n")
+        for r in fp:
+            L.append(f"- `{r['id']}` {r['file']}")
+        L.append("")
+    L += ["## 단계별 정확도\n", "| 항목 | 정확도 |", "|---|---|"]
     for key, cmp, label in [
         ("amount", lambda g, w: norm(g) == w and w is not None, "금액"),
         ("date", lambda g, w: str(g)[:10] == str(w)[:10] and w, "날짜"),

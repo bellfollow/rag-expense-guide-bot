@@ -50,11 +50,14 @@ GEMINI_RECEIPT_EXTRACT_MODEL = genai.GenerativeModel(
 
 # Rules
 1. 반드시 아래 JSON 형식으로만 답하라. 설명이나 코드블록 없이 JSON 객체 하나만 출력하라.
-2. item은 실제 구매/사용 내역을 간결하게 요약하라 (예: "노트북 구입", "회의 다과 구입", "국내선 항공권").
-3. 정보를 알 수 없으면 null로 표기하라.
-4. amount는 숫자만(원 단위, 콤마/통화기호 제외).
+2. is_receipt는 이미지가 영수증/증빙서류(카드전표, 세금계산서, 청구서 등 지출 증빙)인지 먼저 판단하라.
+   사진, 스크린샷, 일러스트, 도표, 인물/풍경 사진 등 지출 증빙이 아니면 false로 표기하라.
+3. is_receipt가 false면 vendor/item/amount/date는 전부 null로 표기하라.
+4. item은 실제 구매/사용 내역을 간결하게 요약하라 (예: "노트북 구입", "회의 다과 구입", "국내선 항공권").
+5. 정보를 알 수 없으면 null로 표기하라.
+6. amount는 숫자만(원 단위, 콤마/통화기호 제외).
 
-{"vendor": "상호명", "item": "구매/사용 내역 요약", "amount": 0, "date": "YYYY-MM-DD"}
+{"is_receipt": true, "vendor": "상호명", "item": "구매/사용 내역 요약", "amount": 0, "date": "YYYY-MM-DD"}
 """,
 )
 

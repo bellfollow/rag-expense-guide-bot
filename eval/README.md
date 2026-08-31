@@ -16,7 +16,9 @@ curl http://localhost:6333/collections  # Qdrant
 | 파일 | 역할 |
 |---|---|
 | `labels_prefilled.csv` | 31장 정답 라벨 (`file` 컬럼이 이미지 파일명) |
-| `run_eval.py` | 채점. 다수결 베이스라인 · macro recall · 건별 판정 근거 출력 |
+| `labels_nonreceipt.csv` | 비영수증 negative set 37장 정답 라벨 (`.venv`에 우연히 섞여있던 라이브러리 샘플 이미지) |
+| `run_eval.py` | 채점. 다수결 베이스라인 · macro recall · 건별 판정 근거 출력. `is_receipt` 오탐(실제 영수증을 거절)도 함께 검사 |
+| `run_eval_nonreceipt.py` | `is_receipt` 거절 채점. `run_eval.py`와 달리 `.venv`를 필터링하지 않고 인덱싱한다 |
 | `variance_probe.py` | 같은 이미지를 N회 태워 **단계별 동일성** 비교. 분산이 어느 단계에서 시작하는지 국소화 |
 | `survey_all.py` | 미검토 사진을 태워 분포만 확인 (평가셋 확장 여지 판정용) |
 
@@ -37,6 +39,9 @@ python eval/variance_probe.py --api http://localhost:5000 \
 # 미검토 사진 분포 조사
 python eval/survey_all.py --api http://localhost:5000 \
   --exclude eval/labels_prefilled.csv --images <영수증 폴더>
+
+# 비영수증 거절(is_receipt) 채점 — .venv가 들어있는 폴더를 --images로 지정
+python eval/run_eval_nonreceipt.py --api http://localhost:5000 --images <.venv 상위 폴더>
 ```
 
 `run_eval.py`와 `survey_all.py`는 결과를 jsonl에 append하므로 중간에 죽어도 이어서 실행된다.

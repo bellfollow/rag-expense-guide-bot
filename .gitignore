@@ -40,3 +40,6 @@ eval_report.md
 survey.jsonl
 survey.md
 variance_probe.md
+eval/*.jsonl
+eval/*_run*.md
+eval/*probe*.md

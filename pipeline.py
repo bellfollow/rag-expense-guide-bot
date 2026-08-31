@@ -381,6 +381,9 @@ async def classify_receipt(
             except Exception:
                 pass
 
+    if extracted.get("is_receipt") is False:
+        return {"extracted": extracted, "classification": None, "compliance": None, "sources": []}
+
     # 2. 비목 분류 (고정 목록 기반, RAG 없이 직접 판정 — 목록이 작고 완결돼있어 검색보다 안정적)
     classify_prompt = (
         f"[영수증 정보]\n"
@@ -402,7 +405,13 @@ async def classify_receipt(
     # "한도/사용기준"과 "제출서류"를 한 쿼리에 섞으면 그 두 단어가 각자 다른 참고표(불인정기준 표 vs
     # 제출서류 표)를 무관하게 끌어올려서 서로를 오염시킨다 — 목적별로 분리해 검색한다.
     if classification.get("flag") == "지원불가":
-        queries = ["회의비 현물성 물품 구매 지급 불가 불인정기준"]
+        # flag=지원불가면 sub_item이 "해당없음"이라 검색 재료가 없다.
+        # taxonomy의 금지 목록이 유한·고정이므로 쿼리도 고정으로 둔다.
+        # item(LLM 출력)을 쓰면 단일 실패점이 하나 늘고, 단독으로는 조항을 못 끌어온다(측정함).
+        queries = [
+            "국내여비 유류비 렌터카 주차비 청구 불가",
+            "회의비 현물성 물품 구매 지급 불가 불인정기준",
+        ]
     else:
         sub_item = classification.get('sub_item') or ''
         queries = [
@@ -456,18 +465,22 @@ async def classify_receipt(
     # citation에 PROHIBITION_MARKERS가 실제로 있을 때만 인정한다 — 문자열 검사는
     # LLM 판단이 아니라 코드로 확정할 수 있는 사실이므로 게이트한다.
     if compliance.get("override_flag") == "지원불가":
-        citation = compliance.get("citation") or ""
-        if any(marker in citation for marker in PROHIBITION_MARKERS):
-            classification["flag_before_override"] = classification.get("flag")
-            classification["override_reason"] = citation
-            classification["flag"] = "지원불가"
-            classification["main_category"] = "해당없음"
-            classification["sub_item"] = "해당없음"
+        if classification.get("flag") == "지원불가":
+            # 분류 단계가 이미 지원불가 — override는 뒤집는 게 아니라 재확인(Rule 0)이므로 게이트 불필요
+            compliance["override_noop"] = "flag 변화 없음 — 게이트 미적용"
         else:
-            compliance["override_rejected"] = f"citation에 금지 표현 없음 — 게이트 차단: {citation!r}"
-            if compliance.get("compliance_status") == "위반의심":
-                compliance["status_before_gate"] = compliance["compliance_status"]
-                compliance["compliance_status"] = "확인불가"
+            citation = compliance.get("citation") or ""
+            if any(marker in citation for marker in PROHIBITION_MARKERS):
+                classification["flag_before_override"] = classification.get("flag")
+                classification["override_reason"] = citation
+                classification["flag"] = "지원불가"
+                classification["main_category"] = "해당없음"
+                classification["sub_item"] = "해당없음"
+            else:
+                compliance["override_rejected"] = f"citation에 금지 표현 없음 — 게이트 차단: {citation!r}"
+                if compliance.get("compliance_status") == "위반의심":
+                    compliance["status_before_gate"] = compliance["compliance_status"]
+                    compliance["compliance_status"] = "확인불가"
 
     # 3-1. 절대금액 캡 결정론적 판정 (LLM 판단과 별개 — 금액은 코드가 직접 계산)
     # grade/region은 현재 추출 단계가 뽑지 않으므로 항상 None으로 넘긴다 — LLM에게
@@ -527,6 +540,8 @@ async def review_settlement(files: list[tuple[bytes, str]], total_budget: int | 
     category_totals: dict[str, int] = {}
     sub_item_totals: dict[str, int] = {}
     for line in lines:
+        if line["classification"] is None:  # is_receipt=false — 집계 제외
+            continue
         amount = line["extracted"].get("amount") or 0
         main_category = line["classification"].get("main_category") or "해당없음"
         sub_item = line["classification"].get("sub_item") or "해당없음"
@@ -537,8 +552,8 @@ async def review_settlement(files: list[tuple[bytes, str]], total_budget: int | 
     if total_budget:
         cap_violations = _check_settlement_caps(category_totals, sub_item_totals, total_budget)
 
-    flagged_count = sum(1 for line in lines if line["classification"].get("flag") == "지원불가")
-    violation_count = sum(1 for line in lines if line["compliance"].get("compliance_status") == "위반의심")
+    flagged_count = sum(1 for line in lines if line["classification"] and line["classification"].get("flag") == "지원불가")
+    violation_count = sum(1 for line in lines if line["compliance"] and line["compliance"].get("compliance_status") == "위반의심")
 
     return {
         "lines": lines,
