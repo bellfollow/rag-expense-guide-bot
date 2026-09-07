@@ -4,6 +4,9 @@
 # MongoDB 데이터
 mongodb_data/
 
+# Qdrant 로컬 모드 마이그레이션 산출물 (scripts/migrate_to_local_qdrant.py 생성물)
+qdrant_data/
+
 # 백업
 backup/
 
