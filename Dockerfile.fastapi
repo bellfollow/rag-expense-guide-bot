@@ -22,4 +22,6 @@ COPY static ./static
 
 EXPOSE 5000
 
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "5000"]
+# Render가 PORT를 주입함(기본 10000) — shell-form이라야 $PORT 치환됨.
+# 로컬 compose는 PORT 안 주므로 기본값 5000 유지.
+CMD uvicorn app:app --host 0.0.0.0 --port ${PORT:-5000}
