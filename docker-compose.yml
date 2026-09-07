@@ -1,17 +1,7 @@
 # AI 사업비 집행 챗봇 인프라
-# MongoDB + Qdrant + FastAPI
+# Qdrant + FastAPI
 
 services:
-  # 데이터 저장소
-  mongodb:
-    image: mongo:latest
-    container_name: mongodb
-    restart: always
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongodb_storage:/data/db
-
   # 벡터 DB (RAG용)
   qdrant:
     image: qdrant/qdrant:latest
@@ -45,11 +35,9 @@ services:
       - ./validate_conversion.py:/app/validate_conversion.py
       - ./manual:/app/manual
     depends_on:
-      - mongodb
       - qdrant
     command: uvicorn app:app --host 0.0.0.0 --port 5000 --reload
 
 # 도커 전용 볼륨 선언
 volumes:
-  mongodb_storage:
   qdrant_storage:

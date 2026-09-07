@@ -75,7 +75,7 @@
 
 ## 6. 스택 / 실행법
 
-`FastAPI` · `Qdrant` · `MongoDB` · `Gemini`(PDF 변환 + LLM) · `jina-embeddings-v3`(1024-dim) · `Docker Compose`
+`FastAPI` · `Qdrant` · `Gemini`(PDF 변환 + LLM) · `jina-embeddings-v3`(1024-dim) · `Docker Compose`
 
 초기 프로토타입은 n8n 오케스트레이션 구조였으나(`backup/`에 이력만 남음), 현재는 FastAPI 단일 서비스로 통합돼 있다.
 
