@@ -1,16 +1,24 @@
-FROM python:3.11-slim
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
-# 시스템 의존성 설치
+# 빌드 시점에만 필요 — 최종 이미지엔 안 들어감 (multi-stage)
 RUN apt-get update && apt-get install -y \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
-COPY app.py .
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY --from=builder /install /usr/local
+
+COPY app.py config.py chunking.py embeddings.py pipeline.py ./
+COPY static ./static
 
 EXPOSE 5000
 
