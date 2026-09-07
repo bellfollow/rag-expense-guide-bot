@@ -13,76 +13,101 @@
     background: #f5f6fa;
     color: #1a1a2e;
     height: 100vh;
-    display: flex;
-    flex-direction: column;
+    overflow: hidden;
   }
 
+  .screen { display: none; height: 100vh; flex-direction: column; }
+  .screen.active { display: flex; }
+
+  /* ── 로그인 화면 ─────────────────────────────────────────── */
+  #screen-login { align-items: center; justify-content: center; background: #1a1a2e; }
+  .login-card {
+    background: #fff; border-radius: 16px; padding: 36px 32px;
+    width: 320px; box-shadow: 0 8px 30px rgba(0,0,0,.3);
+  }
+  .login-card h2 { font-size: 18px; margin-bottom: 4px; }
+  .login-card .sub { font-size: 13px; color: #888; margin-bottom: 22px; }
+  .login-card input {
+    width: 100%; padding: 11px 14px; margin-bottom: 10px;
+    border: 1px solid #ddd; border-radius: 10px; font-size: 14px; font-family: inherit;
+  }
+  .login-card input:focus { outline: none; border-color: #1a1a2e; }
+  .login-card button {
+    width: 100%; padding: 11px; margin-top: 6px;
+    background: #1a1a2e; color: #fff; border: none; border-radius: 10px;
+    font-size: 14px; cursor: pointer; font-family: inherit;
+  }
+  .login-hint { font-size: 11px; color: #aaa; margin-top: 14px; text-align: center; }
+  .login-root-link {
+    display: block; text-align: center; margin-top: 10px;
+    font-size: 12px; color: #888; cursor: pointer; text-decoration: underline;
+  }
+
+  /* ── 앱 셸(사이드바 + 본문) ──────────────────────────────── */
   header {
-    background: #1a1a2e;
-    color: #fff;
-    padding: 16px 24px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-shrink: 0;
+    background: #1a1a2e; color: #fff; padding: 14px 24px;
+    display: flex; align-items: center; gap: 12px; flex-shrink: 0;
   }
-  header h1 { font-size: 18px; font-weight: 600; }
-  header span { font-size: 13px; color: #8888aa; }
+  header h1 { font-size: 17px; font-weight: 600; }
+  header span { font-size: 12px; color: #8888aa; }
+  .topbar-icons { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .icon-btn {
+    background: transparent; border: 1px solid #33335a; color: #ccccdd;
+    width: 34px; height: 34px; border-radius: 8px; cursor: pointer;
+    font-size: 15px; display: flex; align-items: center; justify-content: center;
+  }
+  .icon-btn:hover { background: #33335a; }
+  .icon-btn.admin { border-color: #f57f17; color: #ffd180; }
+  .logout-link { font-size: 12px; color: #ccccdd; cursor: pointer; margin-left: 4px; }
 
-  #chat-window {
-    flex: 1;
-    overflow-y: auto;
-    padding: 24px;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
+  .app-shell { flex: 1; display: flex; min-height: 0; }
+  .sidebar {
+    width: 190px; flex-shrink: 0; background: #22223c; color: #ccccdd;
+    display: flex; flex-direction: column; padding: 16px 10px;
+  }
+  .sidebar-btn {
+    background: transparent; border: none; color: #ccccdd; text-align: left;
+    padding: 11px 14px; border-radius: 8px; font-size: 14px; cursor: pointer;
+    font-family: inherit; margin-bottom: 4px;
+  }
+  .sidebar-btn:hover { background: #33335a; }
+  .sidebar-btn.active { background: #fff; color: #1a1a2e; font-weight: 600; }
+  .sidebar-spacer { flex: 1; }
+  .sidebar-logout {
+    background: transparent; border: 1px solid #444468; color: #999ac0;
+    padding: 9px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; font-family: inherit;
   }
 
-  .bubble {
-    max-width: 780px;
-    width: 100%;
-    margin: 0 auto;
+  .content-area { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .panel { display: none; flex: 1; min-height: 0; flex-direction: column; }
+  .panel.active { display: flex; }
+
+  /* ── 데모 배지 ──────────────────────────────────────────── */
+  .demo-badge {
+    display: inline-block; background: #fff3e0; color: #e65100;
+    font-size: 12px; font-weight: 600; padding: 6px 14px; border-radius: 20px;
+    margin: 16px auto 0; width: fit-content;
   }
 
-  .bubble.user {
-    display: flex;
-    justify-content: flex-end;
-  }
+  /* ── 챗봇 (기존) ────────────────────────────────────────── */
+  #chat-window { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+  .bubble { max-width: 780px; width: 100%; margin: 0 auto; }
+  .bubble.user { display: flex; justify-content: flex-end; }
   .bubble.user .text {
-    background: #1a1a2e;
-    color: #fff;
-    border-radius: 18px 18px 4px 18px;
-    padding: 12px 18px;
-    font-size: 15px;
-    max-width: 70%;
+    background: #1a1a2e; color: #fff; border-radius: 18px 18px 4px 18px;
+    padding: 12px 18px; font-size: 15px; max-width: 70%;
   }
-
-  .bubble.bot .card {
-    background: #fff;
-    border-radius: 4px 18px 18px 18px;
-    padding: 20px 24px;
-    box-shadow: 0 1px 4px rgba(0,0,0,.08);
-  }
+  .bubble.bot .card { background: #fff; border-radius: 4px 18px 18px 18px; padding: 20px 24px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
 
   .confidence {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    font-weight: 600;
-    padding: 4px 10px;
-    border-radius: 20px;
-    margin-bottom: 14px;
+    display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;
+    padding: 4px 10px; border-radius: 20px; margin-bottom: 14px;
   }
-  .confidence.normal  { background: #e8f5e9; color: #2e7d32; }
-  .confidence.weak    { background: #fff8e1; color: #f57f17; }
-  .confidence.out     { background: #fce4ec; color: #c62828; }
+  .confidence.normal { background: #e8f5e9; color: #2e7d32; }
+  .confidence.weak   { background: #fff8e1; color: #f57f17; }
+  .confidence.out    { background: #fce4ec; color: #c62828; }
 
-  .answer {
-    font-size: 15px;
-    line-height: 1.75;
-    color: #1a1a2e;
-  }
+  .answer { font-size: 15px; line-height: 1.75; color: #1a1a2e; }
   .answer h1,.answer h2,.answer h3 { margin: 14px 0 6px; font-size: 15px; }
   .answer ul,.answer ol { padding-left: 20px; margin: 6px 0; }
   .answer li { margin: 3px 0; }
@@ -91,131 +116,49 @@
   .answer th, .answer td { border: 1px solid #e0e0e0; padding: 6px 10px; text-align: left; }
   .answer th { background: #f5f6fa; }
 
-  .sources {
-    margin-top: 16px;
-    border-top: 1px solid #f0f0f0;
-    padding-top: 12px;
-  }
+  .sources { margin-top: 16px; border-top: 1px solid #f0f0f0; padding-top: 12px; }
   .sources-title { font-size: 12px; color: #888; margin-bottom: 8px; font-weight: 600; letter-spacing: .04em; }
-  .source-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 12px;
-    color: #555;
-    padding: 4px 0;
-  }
+  .source-item { display: flex; align-items: center; gap: 10px; font-size: 12px; color: #555; padding: 4px 0; }
   .score-bar-wrap { width: 60px; height: 6px; background: #eee; border-radius: 3px; flex-shrink: 0; }
   .score-bar { height: 100%; border-radius: 3px; }
-  .score-high  { background: #43a047; }
-  .score-mid   { background: #fb8c00; }
-  .score-low   { background: #e53935; }
+  .score-high { background: #43a047; }
+  .score-mid  { background: #fb8c00; }
+  .score-low  { background: #e53935; }
 
   .loading .dot {
-    display: inline-block;
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: #8888aa;
-    margin: 0 2px;
-    animation: bounce .9s infinite;
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    background: #8888aa; margin: 0 2px; animation: bounce .9s infinite;
   }
   .loading .dot:nth-child(2) { animation-delay: .15s; }
   .loading .dot:nth-child(3) { animation-delay: .3s; }
-  @keyframes bounce {
-    0%,80%,100% { transform: translateY(0); }
-    40%          { transform: translateY(-8px); }
-  }
+  @keyframes bounce { 0%,80%,100% { transform: translateY(0); } 40% { transform: translateY(-8px); } }
 
-  #input-bar {
-    background: #fff;
-    border-top: 1px solid #e8e8e8;
-    padding: 16px 24px;
-    flex-shrink: 0;
+  #input-bar { background: #fff; border-top: 1px solid #e8e8e8; padding: 14px 24px; flex-shrink: 0; }
+  #attach-chip-wrap { max-width: 780px; margin: 0 auto; }
+  .attach-chip {
+    display: inline-flex; align-items: center; gap: 8px; background: #eef0fa; color: #1a1a2e;
+    font-size: 12px; padding: 5px 10px; border-radius: 20px; margin-bottom: 8px;
   }
-  #input-wrap {
-    max-width: 780px;
-    margin: 0 auto;
-    display: flex;
-    gap: 10px;
-    align-items: flex-end;
-  }
+  .attach-chip button { background: none; border: none; cursor: pointer; font-size: 12px; color: #888; }
+  #input-wrap { max-width: 780px; margin: 0 auto; display: flex; gap: 8px; align-items: flex-end; }
   #query {
-    flex: 1;
-    resize: none;
-    border: 1px solid #ddd;
-    border-radius: 12px;
-    padding: 12px 16px;
-    font-size: 15px;
-    font-family: inherit;
-    outline: none;
-    max-height: 120px;
-    overflow-y: auto;
+    flex: 1; resize: none; border: 1px solid #ddd; border-radius: 12px; padding: 12px 16px;
+    font-size: 15px; font-family: inherit; outline: none; max-height: 120px; overflow-y: auto;
     transition: border-color .2s;
   }
   #query:focus { border-color: #1a1a2e; }
-  #send-btn {
-    background: #1a1a2e;
-    color: #fff;
-    border: none;
-    border-radius: 12px;
-    padding: 12px 22px;
-    font-size: 15px;
-    cursor: pointer;
-    font-family: inherit;
-    flex-shrink: 0;
-    transition: opacity .2s;
+  #attach-btn, #send-btn {
+    background: #1a1a2e; color: #fff; border: none; border-radius: 12px;
+    font-size: 15px; cursor: pointer; font-family: inherit; flex-shrink: 0; transition: opacity .2s;
   }
+  #attach-btn { background: #fff; color: #1a1a2e; border: 1px solid #ddd; padding: 12px 14px; }
+  #send-btn { padding: 12px 22px; }
   #send-btn:disabled { opacity: .4; cursor: default; }
 
-  .empty-hint {
-    text-align: center;
-    color: #bbb;
-    font-size: 14px;
-    margin: auto;
-    padding: 40px;
-  }
+  .empty-hint { text-align: center; color: #bbb; font-size: 14px; margin: auto; padding: 40px; }
   .empty-hint p { margin-top: 8px; }
 
-  .tabs {
-    display: flex;
-    gap: 4px;
-    margin-left: auto;
-  }
-  .tab-btn {
-    background: transparent;
-    border: 1px solid #33335a;
-    color: #ccccdd;
-    padding: 8px 16px;
-    border-radius: 8px;
-    font-size: 13px;
-    cursor: pointer;
-    font-family: inherit;
-    transition: background .15s;
-  }
-  .tab-btn.active { background: #fff; color: #1a1a2e; font-weight: 600; }
-
-  .panel { display: none; flex: 1; min-height: 0; flex-direction: column; }
-  .panel.active { display: flex; }
-
-  #receipt-panel { overflow-y: auto; padding: 24px; }
-  #receipt-form {
-    max-width: 560px;
-    margin: 0 auto;
-    background: #fff;
-    border-radius: 12px;
-    padding: 24px;
-    box-shadow: 0 1px 4px rgba(0,0,0,.08);
-  }
-  #receipt-form label { font-size: 13px; color: #555; display: block; margin-bottom: 8px; }
-  #receipt-file { display: block; margin-bottom: 14px; font-size: 14px; }
-  #receipt-preview { max-width: 100%; max-height: 200px; border-radius: 8px; margin-bottom: 14px; display: none; }
-  #classify-btn {
-    background: #1a1a2e; color: #fff; border: none; border-radius: 10px;
-    padding: 10px 20px; font-size: 14px; cursor: pointer; font-family: inherit;
-  }
-  #classify-btn:disabled { opacity: .4; cursor: default; }
-
-  #receipt-result { max-width: 560px; margin: 20px auto 0; }
+  /* ── 영수증 판정 결과(챗봇 말풍선 안에서 재사용) ─────────── */
   .field-row { display: flex; justify-content: space-between; font-size: 14px; padding: 6px 0; border-bottom: 1px solid #f0f0f0; }
   .field-row span:first-child { color: #888; }
   .category-badge {
@@ -227,9 +170,6 @@
   .category-badge.low    { background: #fce4ec; color: #c62828; }
   .reasoning { font-size: 13px; color: #444; line-height: 1.6; margin-bottom: 8px; }
   .citation { font-size: 12px; color: #888; font-style: italic; }
-
-  #supporting-docs { display: block; margin-bottom: 14px; font-size: 13px; }
-
   .doc-section { margin-top: 16px; border-top: 1px solid #f0f0f0; padding-top: 12px; }
   .doc-section-title { font-size: 12px; color: #888; margin-bottom: 8px; font-weight: 600; letter-spacing: .04em; }
   .doc-item { font-size: 13px; padding: 6px 0; border-bottom: 1px solid #f5f5f5; }
@@ -239,52 +179,481 @@
   .doc-status.medium { background: #fff8e1; color: #f57f17; }
   .doc-status.low    { background: #fce4ec; color: #c62828; }
   .doc-meta { font-size: 11px; color: #999; margin-top: 2px; }
+  .doc-status.neutral { background: #eee; color: #666; }
+
+  .upload-step {
+    display: inline-block; font-size: 13px; color: #bbb; padding: 6px 14px;
+    border: 1px solid #e0e0e0; border-radius: 20px; margin-right: 8px; margin-bottom: 8px;
+    transition: color .2s, border-color .2s, background .2s;
+  }
+  .upload-step.active { color: #f57f17; border-color: #f57f17; background: #fff8e1; }
+  .upload-step.done   { color: #2e7d32; border-color: #2e7d32; background: #e8f5e9; }
+
+  /* ── 서류 검토 / 관리 / Root 공용 껍데기 위젯 ────────────── */
+  .shell-scroll { flex: 1; overflow-y: auto; padding: 24px 32px; }
+  .panel-title { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+  .panel-desc { font-size: 13px; color: #888; margin-bottom: 4px; }
+  .dropzone {
+    margin-top: 16px; border: 2px dashed #ccd; border-radius: 12px; padding: 36px;
+    text-align: center; color: #999; font-size: 14px; background: #fff; cursor: pointer;
+  }
+  .dropzone:hover { border-color: #1a1a2e; color: #1a1a2e; }
+  .form-row { margin-top: 16px; max-width: 320px; }
+  .form-row label { display: block; font-size: 13px; color: #555; margin-bottom: 6px; }
+  .form-row input { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; font-family: inherit; }
+  .primary-btn {
+    margin-top: 16px; background: #1a1a2e; color: #fff; border: none; border-radius: 10px;
+    padding: 11px 22px; font-size: 14px; cursor: pointer; font-family: inherit;
+  }
+  .section-card { background: #fff; border-radius: 12px; padding: 20px 24px; box-shadow: 0 1px 4px rgba(0,0,0,.08); margin-top: 18px; }
+  .section-card h3 { font-size: 14px; margin-bottom: 12px; }
+  .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .data-table th, .data-table td { text-align: left; padding: 9px 10px; border-bottom: 1px solid #f0f0f0; }
+  .data-table th { color: #888; font-weight: 600; font-size: 12px; }
+  .mini-btn {
+    background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 5px 10px;
+    font-size: 12px; cursor: pointer; font-family: inherit; margin-right: 4px;
+  }
+  .mini-btn:hover { background: #f5f6fa; }
+  .subtab-row { display: flex; gap: 8px; margin: 16px 0 4px; }
+  .subtab-btn {
+    background: #fff; border: 1px solid #ddd; border-radius: 20px; padding: 7px 16px;
+    font-size: 13px; cursor: pointer; font-family: inherit;
+  }
+  .subtab-btn.active { background: #1a1a2e; color: #fff; border-color: #1a1a2e; }
+  .subpanel { display: none; }
+  .subpanel.active { display: block; }
+  .placeholder-box {
+    background: #fafafa; border: 1px dashed #ddd; border-radius: 12px; padding: 40px;
+    text-align: center; color: #aaa; font-size: 14px; margin-top: 16px;
+  }
+
+  /* ── Root 화면 ──────────────────────────────────────────── */
+  #screen-root { background: #f5f6fa; }
+  .root-header { background: #2d1a1a; }
+  .root-badge { background: #fce4ec; color: #c62828 !important; }
+
+  /* ── 버그 제보 플로팅 버튼 ──────────────────────────────── */
+  .fab {
+    position: fixed; right: 28px; bottom: 28px; width: 52px; height: 52px; border-radius: 50%;
+    background: #1a1a2e; color: #fff; border: none; font-size: 20px; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,.25); z-index: 50;
+  }
+  .fab:hover { opacity: .9; }
+
+  /* ── 모달 공통 ──────────────────────────────────────────── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4);
+    align-items: center; justify-content: center; z-index: 100;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: #fff; border-radius: 14px; padding: 24px; width: 380px; max-width: 90vw;
+    max-height: 80vh; overflow-y: auto;
+  }
+  .modal h3 { font-size: 16px; margin-bottom: 4px; }
+  .modal-close { float: right; background: none; border: none; font-size: 18px; cursor: pointer; color: #999; }
+  .modal textarea, .modal input[type=text] {
+    width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px;
+    font-size: 14px; font-family: inherit; margin-top: 10px; resize: vertical;
+  }
+  .setting-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px;
+  }
+  .setting-row span.tag { font-size: 11px; color: #aaa; }
 </style>
 </head>
 <body>
 
-<header>
-  <div>
-    <h1>AI 연구비 집행 챗봇</h1>
-    <span>국가연구개발혁신법 매뉴얼 기반 · 문서 근거 답변만 제공</span>
+<!-- ══════════════════════ 로그인 화면 ══════════════════════ -->
+<div id="screen-login" class="screen active">
+  <div class="login-card">
+    <h2>AI 연구비 집행 챗봇</h2>
+    <div class="sub">로그인해서 시작하세요</div>
+    <input type="text" id="login-id" placeholder="ID">
+    <input type="password" id="login-pw" placeholder="PW">
+    <button id="login-btn">로그인</button>
+    <div class="login-hint">데모: admin / user (비밀번호 검증 없음)</div>
+    <a class="login-root-link" id="root-login-link">Root로 로그인</a>
   </div>
-  <div class="tabs">
-    <button class="tab-btn active" data-tab="chat">챗봇</button>
-    <button class="tab-btn" data-tab="receipt">영수증 분류</button>
-  </div>
-</header>
+</div>
 
-<div id="chat-panel" class="panel active">
-  <div id="chat-window">
-    <div class="empty-hint">
-      <div style="font-size:32px">📄</div>
-      <p>연구비 집행 관련 궁금한 점을 질문하세요.</p>
+<!-- ══════════════════════ 메인 화면 (관리자·사용자 공통) ══════════════════════ -->
+<div id="screen-main" class="screen">
+  <header>
+    <div>
+      <h1>AI 연구비 집행 챗봇</h1>
+      <span>국가연구개발혁신법 매뉴얼 기반 · 문서 근거 답변만 제공</span>
+    </div>
+    <div class="topbar-icons">
+      <button class="icon-btn" id="settings-btn" title="설정">⚙</button>
+      <button class="icon-btn admin" id="admin-btn" title="관리" style="display:none;">A⚙</button>
+      <span class="logout-link" id="logout-link-main">로그아웃</span>
+    </div>
+  </header>
+
+  <div class="app-shell">
+    <nav class="sidebar">
+      <button class="sidebar-btn" data-maintab="chatbot">💬 Q&amp;A 챗봇</button>
+      <button class="sidebar-btn" data-maintab="settlement">📋 서류 검토</button>
+      <div class="sidebar-spacer"></div>
+    </nav>
+
+    <div class="content-area">
+
+      <!-- 탭 1: Q&A 챗봇 (실제 동작 + 영수증 판정 흡수) -->
+      <div id="panel-chatbot" class="panel">
+        <div id="chat-window">
+          <div class="empty-hint">
+            <div style="font-size:32px">📄</div>
+            <p>연구비 집행 관련 궁금한 점을 질문하거나, 📎로 영수증 이미지를 첨부해 판정을 받아보세요.</p>
+          </div>
+        </div>
+        <div id="input-bar">
+          <div id="attach-chip-wrap"></div>
+          <div id="input-wrap">
+            <button id="attach-btn" title="영수증 이미지 첨부">📎</button>
+            <input type="file" id="chat-attach-input" accept="image/*,.pdf" style="display:none;">
+            <textarea id="query" rows="1" placeholder="예: 연구활동비로 구입할 수 있는 항목은?"></textarea>
+            <button id="send-btn">전송</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 탭 2: 서류 검토 (껍데기) -->
+      <div id="panel-settlement" class="panel">
+        <div class="shell-scroll">
+          <div class="panel-title">서류 검토</div>
+          <div class="panel-desc">정산 서류(영수증 여러 장)를 한 번에 검토합니다.</div>
+          <span class="demo-badge">🚧 데모 화면입니다 — 실제로 동작하지 않음</span>
+
+          <div class="dropzone" id="settlement-dropzone">
+            여러 영수증 파일을 여기로 드래그하거나 클릭해 선택하세요
+            <input type="file" id="settlement-file-input" multiple style="display:none;">
+          </div>
+
+          <div class="form-row">
+            <label>총 예산(원)</label>
+            <input type="text" placeholder="예: 5000000">
+          </div>
+
+          <button class="primary-btn" id="settlement-start-btn">검토 시작</button>
+
+          <div class="section-card">
+            <h3>비목별 집행 집계 (더미 데이터)</h3>
+            <table class="data-table">
+              <tr><th>비목</th><th>건수</th><th>합계 금액</th><th>계상 비율</th></tr>
+              <tr><td>시제품제작비</td><td>4</td><td>1,240,000원</td><td>52%</td></tr>
+              <tr><td>활동비</td><td>2</td><td>380,000원</td><td>16%</td></tr>
+              <tr><td>기타 사업운영 경비</td><td>3</td><td>760,000원</td><td>32%</td></tr>
+            </table>
+          </div>
+
+          <div class="section-card">
+            <h3>비율 캡 위반 (더미 데이터)</h3>
+            <div class="doc-item"><span class="doc-status low">위반</span>시제품제작비가 50% 미만 — 계상 기준 미달</div>
+            <div class="doc-item"><span class="doc-status medium">확인필요</span>활동비+기타운영경비 합산이 50%에 근접</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 관리 탭 (A⚙, 관리자만) -->
+      <div id="panel-admin" class="panel">
+        <div class="shell-scroll">
+          <div class="panel-title">관리</div>
+          <span class="demo-badge">🚧 데모 화면입니다 — 실제로 동작하지 않음</span>
+
+          <div class="subtab-row">
+            <button class="subtab-btn" data-adminsub="docs">규정집 관리</button>
+            <button class="subtab-btn" data-adminsub="users">사용자 관리</button>
+          </div>
+
+          <div id="adminsub-docs" class="subpanel">
+            <div class="section-card">
+              <h3>새 규정 업로드</h3>
+
+              <div class="form-row">
+                <label>규정 파일 (PDF)</label>
+                <input type="file" id="doc-upload-file" accept=".pdf,.hwp">
+                <div id="doc-upload-hwp-warning" style="display:none;font-size:12px;color:#c62828;margin-top:6px;">HWP는 아직 지원하지 않습니다 (준비 중)</div>
+              </div>
+
+              <div class="form-row">
+                <label>시행일</label>
+                <input type="date" id="doc-upload-date">
+              </div>
+
+              <div class="form-row" style="display:flex;align-items:center;gap:8px;max-width:none;">
+                <input type="checkbox" id="doc-upload-is-newver" style="width:auto;">
+                <label style="margin:0;" for="doc-upload-is-newver">기존 문서의 새 버전</label>
+              </div>
+              <div class="form-row">
+                <select id="doc-upload-target" disabled style="width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;">
+                  <option value="">— 대상 문서 선택 —</option>
+                  <option value="guiideline.pdf">guiideline.pdf</option>
+                  <option value="national_eval_rule.pdf">national_eval_rule.pdf</option>
+                </select>
+              </div>
+
+              <button class="primary-btn" id="doc-upload-btn">업로드</button>
+
+              <div id="doc-upload-progress" style="display:none;margin-top:18px;">
+                <div class="upload-step" data-step="convert">① 변환</div>
+                <div class="upload-step" data-step="chunk">② 청킹</div>
+                <div class="upload-step" data-step="embed">③ 임베딩</div>
+                <div class="upload-step" data-step="done">④ 완료</div>
+              </div>
+            </div>
+
+            <div class="section-card">
+              <h3>등록된 문서 (더미 데이터, 상태는 시행일 기준 계산값)</h3>
+              <table class="data-table" id="doc-table">
+                <tr><th>파일명</th><th>버전</th><th>시행일</th><th>상태</th><th>조작</th></tr>
+              </table>
+            </div>
+          </div>
+
+          <div id="adminsub-users" class="subpanel">
+            <div class="section-card">
+              <h3>가입 요청 (더미 데이터)</h3>
+              <table class="data-table">
+                <tr><th>ID</th><th>역할</th><th>가입일</th><th>상태</th><th></th></tr>
+                <tr><td>kim.student</td><td>사용자</td><td>2026-09-01</td><td>대기</td>
+                  <td><button class="mini-btn admin-demo-btn">승인</button><button class="mini-btn admin-demo-btn">거절</button></td></tr>
+                <tr><td>park.el</td><td>사용자</td><td>2026-08-30</td><td>대기</td>
+                  <td><button class="mini-btn admin-demo-btn">승인</button><button class="mini-btn admin-demo-btn">거절</button></td></tr>
+                <tr><td>lee.pm</td><td>사용자</td><td>2026-08-28</td><td>승인됨</td>
+                  <td><button class="mini-btn admin-demo-btn">권한 해제</button></td></tr>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
-  <div id="input-bar">
-    <div id="input-wrap">
-      <textarea id="query" rows="1" placeholder="예: 연구활동비로 구입할 수 있는 항목은?"></textarea>
-      <button id="send-btn">전송</button>
+
+  <button class="fab" id="bugreport-fab" title="버그 제보">🐞</button>
+</div>
+
+<!-- ══════════════════════ Root 화면 (껍데기) ══════════════════════ -->
+<div id="screen-root" class="screen">
+  <header class="root-header">
+    <div>
+      <h1>Root 관리</h1>
+      <span>시스템 전체 권한</span>
+    </div>
+    <div class="topbar-icons">
+      <span class="logout-link" id="logout-link-root">로그아웃</span>
+    </div>
+  </header>
+  <div class="shell-scroll">
+    <span class="demo-badge root-badge">🚧 데모 화면입니다 — 실제로 동작하지 않음</span>
+
+    <div class="section-card">
+      <h3>사용자 목록 (더미 데이터)</h3>
+      <table class="data-table">
+        <tr><th>ID</th><th>역할</th><th>가입일</th><th></th></tr>
+        <tr><td>admin</td><td>관리자</td><td>2026-06-01</td>
+          <td><button class="mini-btn admin-demo-btn">관리자 해제</button></td></tr>
+        <tr><td>kim.student</td><td>사용자</td><td>2026-09-01</td>
+          <td><button class="mini-btn admin-demo-btn">관리자 임명</button></td></tr>
+        <tr><td>park.el</td><td>사용자</td><td>2026-08-30</td>
+          <td><button class="mini-btn admin-demo-btn">관리자 임명</button></td></tr>
+      </table>
+    </div>
+
+    <div class="section-card">
+      <h3>시스템 설정</h3>
+      <div class="placeholder-box">준비 중</div>
     </div>
   </div>
 </div>
 
-<div id="receipt-panel" class="panel">
-  <div id="receipt-form">
-    <label>영수증/증빙 이미지 업로드</label>
-    <input type="file" id="receipt-file" accept="image/*,.pdf">
-    <img id="receipt-preview">
-    <label>증빙서류 첨부 (선택, 여러 장 가능 — 출장신청서/카드매출전표 등)</label>
-    <input type="file" id="supporting-docs" accept="image/*,.pdf" multiple>
-    <button id="classify-btn">분류하기</button>
+<!-- ══════════════════════ 모달: 설정 ══════════════════════ -->
+<div class="modal-overlay" id="modal-settings">
+  <div class="modal">
+    <button class="modal-close" data-close-modal="modal-settings">✕</button>
+    <h3>설정</h3>
+    <span class="demo-badge">🚧 데모 화면입니다</span>
+    <div class="setting-row"><span>알림 수신</span><span class="tag">준비 중</span></div>
+    <div class="setting-row"><span>언어</span><span class="tag">준비 중</span></div>
+    <div class="setting-row"><span>테마</span><span class="tag">준비 중</span></div>
   </div>
-  <div id="receipt-result"></div>
+</div>
+
+<!-- ══════════════════════ 모달: 버그 제보 ══════════════════════ -->
+<div class="modal-overlay" id="modal-bugreport">
+  <div class="modal">
+    <button class="modal-close" data-close-modal="modal-bugreport">✕</button>
+    <h3>버그 제보</h3>
+    <span class="demo-badge">🚧 데모 화면입니다 — 실제로 접수되지 않음</span>
+    <input type="text" id="bugreport-title" placeholder="제목">
+    <textarea id="bugreport-body" rows="4" placeholder="내용을 입력하세요"></textarea>
+    <button class="primary-btn" id="bugreport-send-btn" style="width:100%;">전송</button>
+  </div>
 </div>
 
 <script>
+// ══════════════════════ 상태 ══════════════════════
+let role = sessionStorage.getItem('role');   // null | 'admin' | 'user' | 'root'
+let mainTab = 'chatbot';                     // 'chatbot' | 'settlement' | 'admin'
+let adminSubtab = 'docs';                    // 'docs' | 'users'
+
+function render() {
+  const screen = !role ? 'login' : (role === 'root' ? 'root' : 'main');
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + screen).classList.add('active');
+
+  document.getElementById('admin-btn').style.display = (role === 'admin') ? 'flex' : 'none';
+
+  document.querySelectorAll('.sidebar-btn').forEach(b => b.classList.toggle('active', b.dataset.maintab === mainTab));
+  document.querySelectorAll('#screen-main > .app-shell .panel').forEach(p => p.classList.remove('active'));
+  const activePanel = document.getElementById('panel-' + mainTab);
+  if (activePanel) activePanel.classList.add('active');
+
+  document.querySelectorAll('.subtab-btn').forEach(b => b.classList.toggle('active', b.dataset.adminsub === adminSubtab));
+  document.querySelectorAll('.subpanel').forEach(p => p.classList.remove('active'));
+  const activeSub = document.getElementById('adminsub-' + adminSubtab);
+  if (activeSub) activeSub.classList.add('active');
+}
+
+function login(chosenRole) {
+  role = chosenRole;
+  sessionStorage.setItem('role', role);
+  mainTab = 'chatbot';
+  render();
+}
+
+function logout() {
+  role = null;
+  sessionStorage.removeItem('role');
+  render();
+}
+
+document.getElementById('login-btn').addEventListener('click', () => {
+  const id = document.getElementById('login-id').value.trim().toLowerCase();
+  login(id === 'admin' ? 'admin' : 'user');
+});
+document.getElementById('root-login-link').addEventListener('click', (e) => {
+  e.preventDefault();
+  login('root');
+});
+document.getElementById('logout-link-main').addEventListener('click', logout);
+document.getElementById('logout-link-root').addEventListener('click', logout);
+
+document.querySelectorAll('.sidebar-btn').forEach(btn => {
+  btn.addEventListener('click', () => { mainTab = btn.dataset.maintab; render(); });
+});
+document.getElementById('admin-btn').addEventListener('click', () => { mainTab = 'admin'; render(); });
+document.querySelectorAll('.subtab-btn').forEach(btn => {
+  btn.addEventListener('click', () => { adminSubtab = btn.dataset.adminsub; render(); });
+});
+
+render();
+
+// ══════════════════════ 모달 공통 ══════════════════════
+function openModal(id) { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+document.getElementById('settings-btn').addEventListener('click', () => openModal('modal-settings'));
+document.getElementById('bugreport-fab').addEventListener('click', () => openModal('modal-bugreport'));
+document.querySelectorAll('[data-close-modal]').forEach(btn => {
+  btn.addEventListener('click', () => closeModal(btn.dataset.closeModal));
+});
+document.querySelectorAll('.modal-overlay').forEach(ov => {
+  ov.addEventListener('click', (e) => { if (e.target === ov) ov.classList.remove('active'); });
+});
+document.getElementById('bugreport-send-btn').addEventListener('click', () => {
+  alert('데모 화면입니다. 실제로 접수되지 않습니다.');
+  closeModal('modal-bugreport');
+});
+
+// ══════════════════════ 서류 검토 / 관리 탭 껍데기 동작 ══════════════════════
+document.getElementById('settlement-dropzone').addEventListener('click', () => {
+  document.getElementById('settlement-file-input').click();
+});
+document.getElementById('settlement-start-btn').addEventListener('click', () => {
+  alert('데모 화면입니다. 이 기능은 아직 동작하지 않습니다.');
+});
+document.querySelectorAll('.admin-demo-btn').forEach(btn => {
+  btn.addEventListener('click', () => alert('데모 화면입니다. 실제로 반영되지 않습니다.'));
+});
+
+// ── 규정집 관리: 문서 목록 (상태는 시행일 기준 계산값) ──
+const DUMMY_DOCS = [
+  { file: 'guiideline.pdf',         version: 'v2', effective: '2026-06-15' },
+  { file: 'national_eval_rule.pdf', version: 'v1', effective: '2026-06-15' },
+  { file: 'guiideline.pdf',         version: 'v1', effective: '2026-03-02' },
+];
+
+function renderDocTable() {
+  const latestByFile = {};
+  DUMMY_DOCS.forEach(d => {
+    if (!latestByFile[d.file] || d.effective > latestByFile[d.file]) latestByFile[d.file] = d.effective;
+  });
+
+  const table = document.getElementById('doc-table');
+  table.innerHTML = '<tr><th>파일명</th><th>버전</th><th>시행일</th><th>상태</th><th>조작</th></tr>' +
+    DUMMY_DOCS.map(d => {
+      const isLatest = d.effective === latestByFile[d.file];
+      const statusCls = isLatest ? 'high' : 'neutral';
+      const statusLabel = isLatest ? '최신' : '이전버전';
+      return `<tr>
+        <td>${d.file}</td><td>${d.version}</td><td>${d.effective}</td>
+        <td><span class="doc-status ${statusCls}">${statusLabel}</span></td>
+        <td><button class="mini-btn admin-demo-btn">수정</button><button class="mini-btn admin-demo-btn">삭제</button></td>
+      </tr>`;
+    }).join('');
+
+  table.querySelectorAll('.admin-demo-btn').forEach(btn => {
+    btn.addEventListener('click', () => alert('데모 화면입니다. 실제로 반영되지 않습니다.'));
+  });
+}
+renderDocTable();
+
+// ── 규정집 관리: 업로드 영역 ──
+const docUploadFile = document.getElementById('doc-upload-file');
+const docUploadHwpWarning = document.getElementById('doc-upload-hwp-warning');
+docUploadFile.addEventListener('change', () => {
+  const f = docUploadFile.files[0];
+  const isHwp = f && f.name.toLowerCase().endsWith('.hwp');
+  docUploadHwpWarning.style.display = isHwp ? 'block' : 'none';
+  if (isHwp) docUploadFile.value = '';
+});
+
+const docUploadIsNewVer = document.getElementById('doc-upload-is-newver');
+const docUploadTarget = document.getElementById('doc-upload-target');
+docUploadIsNewVer.addEventListener('change', () => {
+  docUploadTarget.disabled = !docUploadIsNewVer.checked;
+});
+
+document.getElementById('doc-upload-btn').addEventListener('click', () => {
+  const progress = document.getElementById('doc-upload-progress');
+  progress.style.display = 'block';
+  const steps = progress.querySelectorAll('.upload-step');
+  steps.forEach(s => s.classList.remove('active', 'done'));
+
+  let i = 0;
+  function advance() {
+    if (i > 0) steps[i - 1].classList.replace('active', 'done');
+    if (i < steps.length) {
+      steps[i].classList.add('active');
+      i++;
+      setTimeout(advance, i === steps.length ? 600 : 1000);
+    } else {
+      steps[steps.length - 1].classList.replace('active', 'done');
+    }
+  }
+  advance();
+});
+
+// ══════════════════════ 챗봇 (기존 로직 + 영수증 판정 흡수) ══════════════════════
 const chatWindow = document.getElementById('chat-window');
 const queryEl    = document.getElementById('query');
 const sendBtn    = document.getElementById('send-btn');
+let attachedFile = null;
 
 function confidenceInfo(sources) {
   if (!sources || sources.length === 0)
@@ -301,13 +670,86 @@ function scoreColor(score) {
   return 'score-low';
 }
 
-function appendUserBubble(text) {
+function buildSourcesHtml(sources) {
+  if (!sources || sources.length === 0) return '';
+  return `<div class="sources">
+    <div class="sources-title">참고 출처</div>
+    ${sources.map(s => {
+      const pct = Math.round(s.score * 100);
+      return `<div class="source-item">
+        <div class="score-bar-wrap"><div class="score-bar ${scoreColor(s.score)}" style="width:${pct}%"></div></div>
+        <span>${pct}%</span>
+        <span>${s.source_file} ${s.title ? '· ' + s.title : ''}</span>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+// classify-receipt 응답 → 결과 HTML (기존 영수증 탭 렌더링 로직 그대로 이식)
+function buildReceiptResultHtml(data) {
+  if (data.extracted && data.extracted.is_receipt === false) {
+    return `<div class="card">영수증으로 인식되지 않았습니다. 영수증 이미지를 올려주세요.</div>`;
+  }
+
+  const ex = data.extracted || {};
+  const cl = data.classification || {};
+  const co = data.compliance || {};
+  const sources = data.sources || [];
+
+  const flagCls = { '정상': 'high', '확인필요': 'medium', '지원불가': 'low' }[cl.flag] || 'medium';
+  const compCls = { '준수': 'high', '확인불가': 'medium', '위반의심': 'low' }[co.compliance_status] || 'medium';
+
+  const reqDocs = co.required_documents || [];
+  const reqDocsHtml = reqDocs.length > 0 ? `
+    <div class="doc-section">
+      <div class="doc-section-title">필요서류</div>
+      ${reqDocs.map(d => `<div class="doc-item">${d}</div>`).join('')}
+    </div>` : '';
+
+  const docMatchStatusCls = { matched: 'high', unclear: 'medium', missing: 'low' };
+  const docMatch = co.document_match || [];
+  const docMatchHtml = docMatch.length > 0 ? `
+    <div class="doc-section">
+      <div class="doc-section-title">증빙서류 대조 결과</div>
+      ${docMatch.map(m => `<div class="doc-item">
+        <span class="doc-status ${docMatchStatusCls[m.status] || 'medium'}">${m.status || '-'}</span>${m.document || ''}
+        ${m.evidence_file ? `<div class="doc-meta">첨부: ${m.evidence_file}</div>` : ''}
+        ${m.reason ? `<div class="doc-meta">${m.reason}</div>` : ''}
+      </div>`).join('')}
+    </div>` : '';
+
+  return `<div class="card">
+    <div class="field-row"><span>상호</span><span>${ex.vendor ?? '-'}</span></div>
+    <div class="field-row"><span>항목</span><span>${ex.item ?? '-'}</span></div>
+    <div class="field-row"><span>금액</span><span>${ex.amount != null ? Number(ex.amount).toLocaleString() + '원' : '-'}</span></div>
+    <div class="field-row"><span>날짜</span><span>${ex.date ?? '-'}</span></div>
+
+    <div class="category-badge ${flagCls}">${cl.main_category || '판정 불가'} &gt; ${cl.sub_item || '-'} (${cl.flag || '-'})</div>
+    <div class="reasoning">${cl.reasoning || ''}</div>
+
+    <div class="category-badge ${compCls}">컴플라이언스: ${co.compliance_status || '확인불가'}</div>
+    <div class="reasoning">${co.compliance_notes || ''}</div>
+    <div class="citation">${co.citation ? '근거: ' + co.citation : ''}</div>
+    ${reqDocsHtml}
+    ${docMatchHtml}
+    ${buildSourcesHtml(sources)}
+  </div>`;
+}
+
+function appendUserBubble(text, file) {
   const hint = chatWindow.querySelector('.empty-hint');
   if (hint) hint.remove();
 
+  let mediaHtml = '';
+  if (file && file.type && file.type.startsWith('image/')) {
+    mediaHtml = `<img src="${URL.createObjectURL(file)}" style="max-width:220px;border-radius:12px;display:block;margin-bottom:${text ? '6px' : '0'};">`;
+  } else if (file) {
+    mediaHtml = `<div style="font-size:12px;opacity:.85;margin-bottom:${text ? '4px' : '0'};">📎 ${file.name}</div>`;
+  }
+
   const div = document.createElement('div');
   div.className = 'bubble user';
-  div.innerHTML = `<div class="text">${text.replace(/</g,'&lt;')}</div>`;
+  div.innerHTML = `<div class="text">${mediaHtml}${text ? text.replace(/</g,'&lt;') : ''}</div>`;
   chatWindow.appendChild(div);
   chatWindow.scrollTop = chatWindow.scrollHeight;
 }
@@ -327,57 +769,77 @@ function appendLoading() {
 function replaceLoading(answer, sources) {
   const loading = document.getElementById('loading-bubble');
   if (!loading) return;
-
   const conf = confidenceInfo(sources);
-
-  const sourcesHtml = (sources && sources.length > 0) ? `
-    <div class="sources">
-      <div class="sources-title">참고 출처</div>
-      ${sources.map(s => {
-        const pct = Math.round(s.score * 100);
-        return `<div class="source-item">
-          <div class="score-bar-wrap"><div class="score-bar ${scoreColor(s.score)}" style="width:${pct}%"></div></div>
-          <span>${pct}%</span>
-          <span>${s.source_file} ${s.title ? '· ' + s.title : ''}</span>
-        </div>`;
-      }).join('')}
-    </div>` : '';
-
   loading.id = '';
   loading.innerHTML = `<div class="card">
     <div class="confidence ${conf.cls}">${conf.label}</div>
     <div class="answer">${marked.parse(answer)}</div>
-    ${sourcesHtml}
+    ${buildSourcesHtml(sources)}
   </div>`;
   chatWindow.scrollTop = chatWindow.scrollHeight;
 }
 
+function replaceLoadingHtml(html) {
+  const loading = document.getElementById('loading-bubble');
+  if (!loading) return;
+  loading.id = '';
+  loading.innerHTML = html;
+  chatWindow.scrollTop = chatWindow.scrollHeight;
+}
+
+function renderAttachChip() {
+  const wrap = document.getElementById('attach-chip-wrap');
+  if (!attachedFile) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = `<div class="attach-chip">📎 ${attachedFile.name} <button type="button" id="attach-remove">✕</button></div>`;
+  document.getElementById('attach-remove').addEventListener('click', () => {
+    attachedFile = null;
+    document.getElementById('chat-attach-input').value = '';
+    renderAttachChip();
+  });
+}
+
+document.getElementById('attach-btn').addEventListener('click', () => {
+  document.getElementById('chat-attach-input').click();
+});
+document.getElementById('chat-attach-input').addEventListener('change', () => {
+  attachedFile = document.getElementById('chat-attach-input').files[0] || null;
+  renderAttachChip();
+});
+
 async function sendQuery() {
   const query = queryEl.value.trim();
-  if (!query) return;
+  const file = attachedFile;
+  if (!query && !file) return;
 
   sendBtn.disabled = true;
   queryEl.value = '';
   queryEl.style.height = 'auto';
 
-  appendUserBubble(query);
+  appendUserBubble(query, file);
   appendLoading();
+  attachedFile = null;
+  document.getElementById('chat-attach-input').value = '';
+  renderAttachChip();
 
   try {
-    const fd = new FormData();
-    fd.append('query', query);
-    fd.append('top_k', '5');
-
-    const res  = await fetch('/chat', { method: 'POST', body: fd });
-    const data = await res.json();
-
-    if (!res.ok) {
-      replaceLoading(`오류가 발생했습니다: ${data.detail || res.status}`, []);
+    if (file) {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res  = await fetch('/classify-receipt', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) replaceLoadingHtml(`<div class="card">오류가 발생했습니다: ${data.detail || res.status}</div>`);
+      else replaceLoadingHtml(buildReceiptResultHtml(data));
     } else {
-      replaceLoading(data.answer, data.sources);
+      const fd = new FormData();
+      fd.append('query', query);
+      fd.append('top_k', '5');
+      const res  = await fetch('/chat', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) replaceLoading(`오류가 발생했습니다: ${data.detail || res.status}`, []);
+      else replaceLoading(data.answer, data.sources);
     }
   } catch (e) {
-    replaceLoading(`서버 연결 오류: ${e.message}`, []);
+    replaceLoadingHtml(`<div class="card">서버 연결 오류: ${e.message}</div>`);
   } finally {
     sendBtn.disabled = false;
     queryEl.focus();
@@ -392,122 +854,6 @@ queryEl.addEventListener('input', () => {
   queryEl.style.height = 'auto';
   queryEl.style.height = queryEl.scrollHeight + 'px';
 });
-
-// ── 탭 전환 ──────────────────────────────────────────────────
-document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById(`${btn.dataset.tab}-panel`).classList.add('active');
-  });
-});
-
-// ── 영수증 비목분류 ──────────────────────────────────────────
-const receiptFile     = document.getElementById('receipt-file');
-const receiptPreview  = document.getElementById('receipt-preview');
-const supportingDocs  = document.getElementById('supporting-docs');
-const classifyBtn     = document.getElementById('classify-btn');
-const receiptResult   = document.getElementById('receipt-result');
-
-receiptFile.addEventListener('change', () => {
-  const file = receiptFile.files[0];
-  if (file && file.type.startsWith('image/')) {
-    receiptPreview.src = URL.createObjectURL(file);
-    receiptPreview.style.display = 'block';
-  } else {
-    receiptPreview.style.display = 'none';
-  }
-});
-
-async function classifyReceipt() {
-  const file = receiptFile.files[0];
-  if (!file) return;
-
-  classifyBtn.disabled = true;
-  receiptResult.innerHTML = `<div class="card loading" style="max-width:560px;margin:0 auto;">
-    <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-  </div>`;
-
-  try {
-    const fd = new FormData();
-    fd.append('file', file);
-    if (supportingDocs.files.length > 0) {
-      for (const f of supportingDocs.files) fd.append('supporting_docs', f);
-    }
-
-    const res  = await fetch('/classify-receipt', { method: 'POST', body: fd });
-    const data = await res.json();
-
-    if (!res.ok) {
-      receiptResult.innerHTML = `<div class="card">오류가 발생했습니다: ${data.detail || res.status}</div>`;
-      return;
-    }
-
-    const ex = data.extracted || {};
-    const cl = data.classification || {};
-    const co = data.compliance || {};
-    const sources = data.sources || [];
-
-    const flagCls = { '정상': 'high', '확인필요': 'medium', '지원불가': 'low' }[cl.flag] || 'medium';
-    const compCls = { '준수': 'high', '확인불가': 'medium', '위반의심': 'low' }[co.compliance_status] || 'medium';
-
-    const sourcesHtml = sources.length > 0 ? `
-      <div class="sources">
-        <div class="sources-title">참고 출처</div>
-        ${sources.map(s => {
-          const pct = Math.round(s.score * 100);
-          return `<div class="source-item">
-            <div class="score-bar-wrap"><div class="score-bar ${scoreColor(s.score)}" style="width:${pct}%"></div></div>
-            <span>${pct}%</span>
-            <span>${s.source_file} ${s.title ? '· ' + s.title : ''}</span>
-          </div>`;
-        }).join('')}
-      </div>` : '';
-
-    const reqDocs = co.required_documents || [];
-    const reqDocsHtml = reqDocs.length > 0 ? `
-      <div class="doc-section">
-        <div class="doc-section-title">필요서류</div>
-        ${reqDocs.map(d => `<div class="doc-item">${d}</div>`).join('')}
-      </div>` : '';
-
-    const docMatchStatusCls = { matched: 'high', unclear: 'medium', missing: 'low' };
-    const docMatch = co.document_match || [];
-    const docMatchHtml = docMatch.length > 0 ? `
-      <div class="doc-section">
-        <div class="doc-section-title">증빙서류 대조 결과</div>
-        ${docMatch.map(m => `<div class="doc-item">
-          <span class="doc-status ${docMatchStatusCls[m.status] || 'medium'}">${m.status || '-'}</span>${m.document || ''}
-          ${m.evidence_file ? `<div class="doc-meta">첨부: ${m.evidence_file}</div>` : ''}
-          ${m.reason ? `<div class="doc-meta">${m.reason}</div>` : ''}
-        </div>`).join('')}
-      </div>` : '';
-
-    receiptResult.innerHTML = `<div class="card">
-      <div class="field-row"><span>상호</span><span>${ex.vendor ?? '-'}</span></div>
-      <div class="field-row"><span>항목</span><span>${ex.item ?? '-'}</span></div>
-      <div class="field-row"><span>금액</span><span>${ex.amount != null ? Number(ex.amount).toLocaleString() + '원' : '-'}</span></div>
-      <div class="field-row"><span>날짜</span><span>${ex.date ?? '-'}</span></div>
-
-      <div class="category-badge ${flagCls}">${cl.main_category || '판정 불가'} &gt; ${cl.sub_item || '-'} (${cl.flag || '-'})</div>
-      <div class="reasoning">${cl.reasoning || ''}</div>
-
-      <div class="category-badge ${compCls}">컴플라이언스: ${co.compliance_status || '확인불가'}</div>
-      <div class="reasoning">${co.compliance_notes || ''}</div>
-      <div class="citation">${co.citation ? '근거: ' + co.citation : ''}</div>
-      ${reqDocsHtml}
-      ${docMatchHtml}
-      ${sourcesHtml}
-    </div>`;
-  } catch (e) {
-    receiptResult.innerHTML = `<div class="card">서버 연결 오류: ${e.message}</div>`;
-  } finally {
-    classifyBtn.disabled = false;
-  }
-}
-
-classifyBtn.addEventListener('click', classifyReceipt);
 </script>
 </body>
 </html>
