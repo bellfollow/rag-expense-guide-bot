@@ -7,8 +7,10 @@ mongodb_data/
 # 백업
 backup/
 
-# 내부 문서 (분석/계획/핸드오프)
-docs/
+# 내부 문서 (분석/계획/핸드오프) — 단 README용 스크린샷은 예외
+docs/*
+!docs/images/
+!docs/images/**
 document/
 manual/
 .claude/
