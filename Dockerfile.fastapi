@@ -19,6 +19,7 @@ COPY --from=builder /install /usr/local
 
 COPY app.py config.py chunking.py embeddings.py pipeline.py ./
 COPY static ./static
+COPY qdrant_data ./qdrant_data
 
 EXPOSE 5000
 
