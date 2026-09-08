@@ -1,5 +1,11 @@
 # 사업비 집행 가이드 챗봇
 
+**라이브 데모**: https://rag-expense-guide-bot.onrender.com
+(데모 계정: `user` / 비밀번호 검증 없음)
+Render 무료 인스턴스라 15분 방치 시 절전되며, 첫 요청에 50초 정도 걸린다.
+
+---
+
 ## 1. 뭘 하는가
 
 국가연구비(창업탐색비) 집행 규정 RAG 챗봇 + 정산 서류 검토 시스템이다.
@@ -118,4 +124,20 @@
 ```bash
 docker compose up -d
 # GET /health 로 준비 상태 확인 후 http://localhost:5000 접속
+```
+
+### 배포
+
+Render 무료 티어 단일 컨테이너. Qdrant를 별도 서버가 아니라 qdrant-client 로컬 모드(파일 기반)로 띄우고, 인덱스(466포인트, 20MB)를 이미지에 포함해 컨테이너 하나로 동작한다.
+
+배포 전 검토한 것:
+- 무료 티어 비교: Fly.io는 무료 티어 폐지, Railway는 크레딧 소진 후 유료 → Render 선택
+- Qdrant Cloud 무료 티어는 1주 방치 시 suspend되어 데모 링크로 부적합 → 로컬 모드 채택
+- 이미지 1.25GB → 784MB(multi-stage로 build-essential 제거) → 795MB(인덱스 포함)
+- 런타임 메모리 125MB로 512MB 제한 내
+- Dockerfile이 app.py만 COPY하고 나머지는 compose 바인드마운트에 의존해 이미지 단독으로는 ImportError로 죽는 상태였음 — 배포 시도 중 발견해 수정
+
+이미지 빌드 전 인덱스가 필요하다:
+```bash
+python scripts/migrate_to_local_qdrant.py
 ```
