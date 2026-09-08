@@ -386,4 +386,8 @@ GEMINI_DOC_MATCH_MODEL = genai.GenerativeModel(
 
 GEMINI_CONFIG = genai.types.GenerationConfig(temperature=0.0, max_output_tokens=65536)
 
-qdrant_client = QdrantClient(host="qdrant", port=6333)
+QDRANT_PATH = os.getenv("QDRANT_PATH", "")
+if QDRANT_PATH:
+    qdrant_client = QdrantClient(path=QDRANT_PATH)
+else:
+    qdrant_client = QdrantClient(host="qdrant", port=6333)

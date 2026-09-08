@@ -82,13 +82,6 @@
   .panel { display: none; flex: 1; min-height: 0; flex-direction: column; }
   .panel.active { display: flex; }
 
-  /* ── 데모 배지 ──────────────────────────────────────────── */
-  .demo-badge {
-    display: inline-block; background: #fff3e0; color: #e65100;
-    font-size: 12px; font-weight: 600; padding: 6px 14px; border-radius: 20px;
-    margin: 16px auto 0; width: fit-content;
-  }
-
   /* ── 챗봇 (기존) ────────────────────────────────────────── */
   #chat-window { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
   .bubble { max-width: 780px; width: 100%; margin: 0 auto; }
@@ -231,7 +224,6 @@
   /* ── Root 화면 ──────────────────────────────────────────── */
   #screen-root { background: #f5f6fa; }
   .root-header { background: #2d1a1a; }
-  .root-badge { background: #fce4ec; color: #c62828 !important; }
 
   /* ── 버그 제보 플로팅 버튼 ──────────────────────────────── */
   .fab {
@@ -326,7 +318,6 @@
         <div class="shell-scroll">
           <div class="panel-title">서류 검토</div>
           <div class="panel-desc">정산 서류(영수증 여러 장)를 한 번에 검토합니다.</div>
-          <span class="demo-badge">🚧 데모 화면입니다 — 실제로 동작하지 않음</span>
 
           <div class="dropzone" id="settlement-dropzone">
             여러 영수증 파일을 여기로 드래그하거나 클릭해 선택하세요
@@ -362,7 +353,6 @@
       <div id="panel-admin" class="panel">
         <div class="shell-scroll">
           <div class="panel-title">관리</div>
-          <span class="demo-badge">🚧 데모 화면입니다 — 실제로 동작하지 않음</span>
 
           <div class="subtab-row">
             <button class="subtab-btn" data-adminsub="docs">규정집 관리</button>
@@ -381,7 +371,7 @@
 
               <div class="form-row">
                 <label>시행일</label>
-                <input type="date" id="doc-upload-date">
+                <input type="date" id="doc-upload-date" min="2000-01-01" max="2100-12-31">
               </div>
 
               <div class="form-row" style="display:flex;align-items:center;gap:8px;max-width:none;">
@@ -449,7 +439,6 @@
     </div>
   </header>
   <div class="shell-scroll">
-    <span class="demo-badge root-badge">🚧 데모 화면입니다 — 실제로 동작하지 않음</span>
 
     <div class="section-card">
       <h3>사용자 목록 (더미 데이터)</h3>
@@ -476,7 +465,6 @@
   <div class="modal">
     <button class="modal-close" data-close-modal="modal-settings">✕</button>
     <h3>설정</h3>
-    <span class="demo-badge">🚧 데모 화면입니다</span>
     <div class="setting-row"><span>알림 수신</span><span class="tag">준비 중</span></div>
     <div class="setting-row"><span>언어</span><span class="tag">준비 중</span></div>
     <div class="setting-row"><span>테마</span><span class="tag">준비 중</span></div>
@@ -488,7 +476,6 @@
   <div class="modal">
     <button class="modal-close" data-close-modal="modal-bugreport">✕</button>
     <h3>버그 제보</h3>
-    <span class="demo-badge">🚧 데모 화면입니다 — 실제로 접수되지 않음</span>
     <input type="text" id="bugreport-title" placeholder="제목">
     <textarea id="bugreport-body" rows="4" placeholder="내용을 입력하세요"></textarea>
     <button class="primary-btn" id="bugreport-send-btn" style="width:100%;">전송</button>
@@ -498,8 +485,8 @@
 <script>
 // ══════════════════════ 상태 ══════════════════════
 let role = sessionStorage.getItem('role');   // null | 'admin' | 'user' | 'root'
-let mainTab = 'chatbot';                     // 'chatbot' | 'settlement' | 'admin'
-let adminSubtab = 'docs';                    // 'docs' | 'users'
+let mainTab = sessionStorage.getItem('mainTab') || 'chatbot';       // 'chatbot' | 'settlement' | 'admin'
+let adminSubtab = sessionStorage.getItem('adminSubtab') || 'docs';  // 'docs' | 'users'
 
 function render() {
   const screen = !role ? 'login' : (role === 'root' ? 'root' : 'main');
@@ -528,7 +515,11 @@ function login(chosenRole) {
 
 function logout() {
   role = null;
+  mainTab = 'chatbot';
+  adminSubtab = 'docs';
   sessionStorage.removeItem('role');
+  sessionStorage.removeItem('mainTab');
+  sessionStorage.removeItem('adminSubtab');
   render();
 }
 
@@ -544,11 +535,11 @@ document.getElementById('logout-link-main').addEventListener('click', logout);
 document.getElementById('logout-link-root').addEventListener('click', logout);
 
 document.querySelectorAll('.sidebar-btn').forEach(btn => {
-  btn.addEventListener('click', () => { mainTab = btn.dataset.maintab; render(); });
+  btn.addEventListener('click', () => { mainTab = btn.dataset.maintab; sessionStorage.setItem('mainTab', mainTab); render(); });
 });
-document.getElementById('admin-btn').addEventListener('click', () => { mainTab = 'admin'; render(); });
+document.getElementById('admin-btn').addEventListener('click', () => { mainTab = 'admin'; sessionStorage.setItem('mainTab', mainTab); render(); });
 document.querySelectorAll('.subtab-btn').forEach(btn => {
-  btn.addEventListener('click', () => { adminSubtab = btn.dataset.adminsub; render(); });
+  btn.addEventListener('click', () => { adminSubtab = btn.dataset.adminsub; sessionStorage.setItem('adminSubtab', adminSubtab); render(); });
 });
 
 render();
@@ -566,19 +557,12 @@ document.querySelectorAll('.modal-overlay').forEach(ov => {
   ov.addEventListener('click', (e) => { if (e.target === ov) ov.classList.remove('active'); });
 });
 document.getElementById('bugreport-send-btn').addEventListener('click', () => {
-  alert('데모 화면입니다. 실제로 접수되지 않습니다.');
   closeModal('modal-bugreport');
 });
 
 // ══════════════════════ 서류 검토 / 관리 탭 껍데기 동작 ══════════════════════
 document.getElementById('settlement-dropzone').addEventListener('click', () => {
   document.getElementById('settlement-file-input').click();
-});
-document.getElementById('settlement-start-btn').addEventListener('click', () => {
-  alert('데모 화면입니다. 이 기능은 아직 동작하지 않습니다.');
-});
-document.querySelectorAll('.admin-demo-btn').forEach(btn => {
-  btn.addEventListener('click', () => alert('데모 화면입니다. 실제로 반영되지 않습니다.'));
 });
 
 // ── 규정집 관리: 문서 목록 (상태는 시행일 기준 계산값) ──
@@ -606,10 +590,6 @@ function renderDocTable() {
         <td><button class="mini-btn admin-demo-btn">수정</button><button class="mini-btn admin-demo-btn">삭제</button></td>
       </tr>`;
     }).join('');
-
-  table.querySelectorAll('.admin-demo-btn').forEach(btn => {
-    btn.addEventListener('click', () => alert('데모 화면입니다. 실제로 반영되지 않습니다.'));
-  });
 }
 renderDocTable();
 

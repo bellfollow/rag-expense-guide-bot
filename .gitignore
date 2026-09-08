@@ -4,8 +4,8 @@
 # MongoDB 데이터
 mongodb_data/
 
-# Qdrant 로컬 모드 마이그레이션 산출물 (scripts/migrate_to_local_qdrant.py 생성물)
-qdrant_data/
+# 그냥 프롬프트 모음집 굳이 안넣어도됨
+prompt/
 
 # 백업
 backup/
