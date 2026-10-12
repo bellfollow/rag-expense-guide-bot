@@ -590,9 +590,8 @@ def _update_report(result: dict) -> None:
                     records[parts[0]] = parts
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
-    records[result["filename"]] = [result["filename"], result.get("file_size_mb", "-"),
-                                   str(result["chunks_count"]), now, "✅"]
-    total = sum(int(r[2]) for r in records.values() if r[2].isdigit())
+    records[result["filename"]] = [result["filename"], str(result["chunks_count"]), now, "✅"]
+    total = sum(int(r[1]) for r in records.values() if r[1].isdigit())
 
     lines = [
         "# PDF 처리 현황 보고서", f"최종 업데이트: {now}", "",
@@ -602,7 +601,7 @@ def _update_report(result: dict) -> None:
         "## 문서별 상세", "| 파일명 | 청크 수 | 처리 일시 | 상태 |", "|--------|---------|-----------|------|",
     ]
     for r in sorted(records.values(), key=lambda x: x[0]):
-        lines.append(f"| {r[0]} | {r[2]} | {r[3]} | {r[4]} |")
+        lines.append(f"| {r[0]} | {r[1]} | {r[2]} | {r[3]} |")
 
     report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"📊 Report updated: {report_path}")
