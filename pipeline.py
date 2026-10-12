@@ -144,9 +144,12 @@ async def process_pdf(file_content: bytes, filename: str, raw_markdown: str | No
     # 1. 변환
     if raw_markdown is None:
         print(f"[1/4] Converting {filename}...")
-        raw_markdown, _ = await convert_pdf_to_markdown(file_content, filename)
+        raw_markdown, finish_reason = await convert_pdf_to_markdown(file_content, filename)
+        if finish_reason != "STOP":
+            raise RuntimeError(f"Conversion incomplete ({finish_reason}): {filename}")
     else:
         print(f"[1/4] Skipping Gemini conversion (pre-converted)")
+        finish_reason = "STOP"
 
     # 변환 결과 저장 (품질 확인용)
     try:
@@ -186,6 +189,7 @@ async def process_pdf(file_content: bytes, filename: str, raw_markdown: str | No
         "embed_model": "jina-embeddings-v3",
         "doc_tier": doc_tier["tier"],
         "doc_tier_label": doc_tier["label"],
+        "finish_reason": finish_reason,
     }
 
     try:

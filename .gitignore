@@ -38,6 +38,7 @@ __pycache__/
 mongo_error.txt
 my_project_tree.txt
 tree.py
+claude/*
 
 # eval 실행 산출물 (실제 영수증 데이터에서 나온 값 — 이미지 자체는 애초에 레포 밖)
 eval_result.jsonl
