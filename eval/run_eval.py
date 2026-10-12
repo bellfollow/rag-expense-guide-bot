@@ -67,29 +67,31 @@ def run(api, index, labels, out):
                 rec["error"] = f"HTTP {r.status_code}: {r.text[:200]}"
             else:
                 d = r.json()
+                cls = d.get("classification") or {}
+                comp = d.get("compliance") or {}
                 rec["got"] = {
                     "is_receipt": d["extracted"].get("is_receipt"),
                     "amount": d["extracted"].get("amount"),
                     "date": d["extracted"].get("date"),
                     "vendor": d["extracted"].get("vendor"),
-                    "sub_item": d["classification"].get("sub_item"),
-                    "flag": d["classification"].get("flag"),
+                    "sub_item": cls.get("sub_item"),
+                    "flag": cls.get("flag"),
                     # 파이프라인 실제 필드명은 compliance_status, 값은 준수|위반의심|확인불가
-                    "status": d["compliance"].get("compliance_status"),
-                    "absolute_cap": (d["compliance"].get("absolute_cap") or {}).get("status"),
+                    "status": comp.get("compliance_status"),
+                    "absolute_cap": (comp.get("absolute_cap") or {}).get("status"),
                     "sources": [s["source_file"] for s in d.get("sources", [])],
                 }
                 # 원인 분석용 원문 — 이거 없으면 왜 그렇게 판정했는지 못 봄
                 rec["raw"] = {
                     # 분류가 맞춘 것 vs 컴플라이언스가 구제한 것을 구분하기 위한 필드
-                    "flag_before_override": d["classification"].get("flag_before_override"),
-                    "override_reason": d["classification"].get("override_reason"),
-                    "override_rejected": d["compliance"].get("override_rejected"),
-                    "cls_reasoning": d["classification"].get("reasoning"),
-                    "cls_confidence": d["classification"].get("confidence"),
-                    "comp_notes": d["compliance"].get("compliance_notes"),
-                    "citation": d["compliance"].get("citation"),
-                    "required_documents": d["compliance"].get("required_documents"),
+                    "flag_before_override": cls.get("flag_before_override"),
+                    "override_reason": cls.get("override_reason"),
+                    "override_rejected": comp.get("override_rejected"),
+                    "cls_reasoning": cls.get("reasoning"),
+                    "cls_confidence": cls.get("confidence"),
+                    "comp_notes": comp.get("compliance_notes"),
+                    "citation": comp.get("citation"),
+                    "required_documents": comp.get("required_documents"),
                 }
         except Exception as e:
             rec["error"] = f"{type(e).__name__}: {e}"
@@ -107,7 +109,7 @@ def run(api, index, labels, out):
 
 def score(out, report):
     rows = [json.loads(l) for l in out.read_text(encoding="utf-8").splitlines() if l.strip()]
-    ok = [r for r in rows if "error" in r is False or "got" in r]
+    ok = [r for r in rows if "error" not in r]
     n = len(ok)
     if not n:
         print("성공 0건 — 전부 실패"); return

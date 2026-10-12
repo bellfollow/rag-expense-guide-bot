@@ -66,15 +66,16 @@ if __name__ == "__main__":
                 rec["error"] = f"HTTP {r.status_code}"
             else:
                 d = r.json()
+                cls = d.get("classification") or {}
                 rec.update({
                     "vendor": d["extracted"].get("vendor"),
                     "item": d["extracted"].get("item"),
                     "amount": d["extracted"].get("amount"),
                     "date": d["extracted"].get("date"),
-                    "sub_item": d["classification"].get("sub_item"),
-                    "flag": d["classification"].get("flag"),
-                    "confidence": d["classification"].get("confidence"),
-                    "reasoning": d["classification"].get("reasoning"),
+                    "sub_item": cls.get("sub_item"),
+                    "flag": cls.get("flag"),
+                    "confidence": cls.get("confidence"),
+                    "reasoning": cls.get("reasoning"),
                 })
         except Exception as e:
             rec["error"] = f"{type(e).__name__}: {e}"

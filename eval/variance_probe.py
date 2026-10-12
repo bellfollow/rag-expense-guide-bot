@@ -58,7 +58,7 @@ def probe(api, path, n):
             print(f"  run{i+1} 실패: HTTP {r.status_code} {r.text[:120]}")
             continue
         d = r.json()
-        rec = {f"{label}.{key}": d.get(sec, {}).get(key) for label, sec, key in FIELDS}
+        rec = {f"{label}.{key}": (d.get(sec) or {}).get(key) for label, sec, key in FIELDS}
         # ③ 검색은 어떤 문서가 올라왔는지로 본다
         rec["③ 검색.sources"] = "|".join(s["source_file"] for s in d.get("sources", []))
         rec["③ 검색.top_score"] = (d.get("sources") or [{}])[0].get("score")
