@@ -13,6 +13,12 @@ import requests
 
 SKIP_DIRS = {".venv", "venv", "site-packages", "__pycache__", "node_modules", ".git"}
 
+# legacy jsonl 호환용 — 옛 라벨 어휘(taxonomy에 없음)를 현재 라벨 값으로 치환
+LEGACY_SUB_ITEM = {
+    "국내여비(식비)": "국내여비(운임/숙박비/식비/일비)",
+    "국내여비(숙박비)": "국내여비(운임/숙박비/식비/일비)",
+}
+
 
 def norm(v):
     if v in (None, ""):
@@ -110,6 +116,8 @@ def run(api, index, labels, out):
 
 def score(out, report):
     rows = [json.loads(l) for l in out.read_text(encoding="utf-8").splitlines() if l.strip()]
+    for r in rows:
+        r["want"]["sub_item"] = LEGACY_SUB_ITEM.get(r["want"]["sub_item"], r["want"]["sub_item"])
     ok = [r for r in rows if "error" not in r]
     n = len(ok)
     if not n:
