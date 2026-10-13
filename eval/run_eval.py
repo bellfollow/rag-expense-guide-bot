@@ -87,6 +87,7 @@ def run(api, index, labels, out):
                     "flag_before_override": cls.get("flag_before_override"),
                     "override_reason": cls.get("override_reason"),
                     "override_rejected": comp.get("override_rejected"),
+                    "override_noop": comp.get("override_noop"),
                     "cls_reasoning": cls.get("reasoning"),
                     "cls_confidence": cls.get("confidence"),
                     "comp_notes": comp.get("compliance_notes"),
