@@ -17,6 +17,18 @@ from pipeline import convert_pdf_to_markdown, process_pdf
 
 app = FastAPI(title="AI 연구비 집행 챗봇 서버")
 
+QUOTA_MESSAGE = "데모용 API 크레딧이 소진되어 일시적으로 응답할 수 없습니다."
+
+
+def _raise_if_quota(e: Exception) -> None:
+    # SDK 예외 클래스 확인 전이라 "429 " 접두 검사만 쓴다. 래핑된 RuntimeError는 원본이 __context__에 남는다.
+    seen = set()
+    while e is not None and id(e) not in seen:
+        seen.add(id(e))
+        if str(e).startswith("429 "):
+            raise HTTPException(status_code=503, detail=QUOTA_MESSAGE)
+        e = e.__cause__ or e.__context__
+
 STATIC_DIR = Path(__file__).parent / "static"
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
@@ -375,8 +387,10 @@ async def chat_endpoint(query: str = Form(...), top_k: int = Form(5)):
     try:
         return await pipeline_chat(query, top_k=top_k)
     except RuntimeError as e:
+        _raise_if_quota(e)
         raise HTTPException(status_code=502, detail=str(e))
     except Exception as e:
+        _raise_if_quota(e)
         raise HTTPException(status_code=500, detail=f"chat 처리 중 오류: {e}")
 
 
@@ -391,8 +405,10 @@ async def classify_receipt_endpoint(
         result = await pipeline_classify_receipt(content, file.filename, supporting_docs=docs or None)
         return {"status": "success", **result}
     except RuntimeError as e:
+        _raise_if_quota(e)
         raise HTTPException(status_code=502, detail=str(e))
     except Exception as e:
+        _raise_if_quota(e)
         raise HTTPException(status_code=500, detail=f"영수증 분류 중 오류: {e}")
 
 
