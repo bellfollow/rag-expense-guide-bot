@@ -749,10 +749,10 @@ function appendLoading() {
 function replaceLoading(answer, sources) {
   const loading = document.getElementById('loading-bubble');
   if (!loading) return;
-  const conf = confidenceInfo(sources);
+  const conf = sources === null ? null : confidenceInfo(sources);
   loading.id = '';
   loading.innerHTML = `<div class="card">
-    <div class="confidence ${conf.cls}">${conf.label}</div>
+    ${conf ? `<div class="confidence ${conf.cls}">${conf.label}</div>` : ''}
     <div class="answer">${marked.parse(answer)}</div>
     ${buildSourcesHtml(sources)}
   </div>`;
@@ -815,7 +815,7 @@ async function sendQuery() {
       fd.append('top_k', '5');
       const res  = await fetch('/chat', { method: 'POST', body: fd });
       const data = await res.json();
-      if (!res.ok) replaceLoading(`오류가 발생했습니다: ${data.detail || res.status}`, []);
+      if (!res.ok) replaceLoading(`오류가 발생했습니다: ${data.detail || res.status}`, null);
       else replaceLoading(data.answer, data.sources);
     }
   } catch (e) {
