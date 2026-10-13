@@ -312,6 +312,9 @@ async def convert_by_chapters(file: UploadFile = File(...), chunks: str = Form("
                 all_markdown.append(md)
                 all_failed.extend(failed)
 
+            if all_failed:
+                raise HTTPException(status_code=502, detail=f"변환 실패 구간 {len(all_failed)}개 — 저장 중단: {all_failed}")
+
             combined = "\n\n".join(all_markdown)
             result = await process_pdf(content, file.filename, raw_markdown=combined)
             return {"status": "success", "filename": file.filename, "total_pages": total_pages,
