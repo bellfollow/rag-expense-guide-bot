@@ -14,6 +14,8 @@ backup/
 docs/*
 !docs/images/
 !docs/images/**
+!docs/findings/
+!docs/findings/**
 document/
 manual/
 .claude/
