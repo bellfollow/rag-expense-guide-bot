@@ -5,7 +5,7 @@
 
 필요: requests, pandas.  레포/venv/도커 무관 — 앱만 떠 있으면 됨.
 """
-import argparse, json
+import argparse, csv, json
 from pathlib import Path
 import pandas as pd
 import requests
@@ -18,6 +18,10 @@ LEGACY_SUB_ITEM = {
     "국내여비(식비)": "국내여비(운임/숙박비/식비/일비)",
     "국내여비(숙박비)": "국내여비(운임/숙박비/식비/일비)",
 }
+
+# citation 채점용 정답 조항 — jsonl에 저장하지 않으므로 legacy jsonl 포함 전부 id로 CSV 조인한다.
+# 조인 범위: gold_citation, gold_phrase 두 컬럼만 (그 외 컬럼은 jsonl의 want를 그대로 쓴다).
+LABELS_CSV = Path(__file__).parent / "labels_prefilled.csv"
 
 
 def norm(v):
@@ -226,6 +230,27 @@ def score(out, report):
         L.append(f"\n## 처리 실패 {len(err)}건\n")
         for r in err:
             L.append(f"- `{r['id']}` {r['error'][:120]}")
+
+    # citation 채점 — 대상은 정답 flag=지원불가 전체. flag가 틀렸거나 citation이 없으면 P/F 모두 오답.
+    # P(주): citation에 gold_phrase 포함 / F(보조): citation이 gold_citation 문장 전체를 포함
+    tg = [r for r in ok if r["want"]["flag"] == "지원불가"]
+    if tg:
+        gold = {g["id"]: g for g in csv.DictReader(LABELS_CSV.open(encoding="utf-8", newline=""))}
+        res = []
+        for r in tg:
+            cit = str((r.get("raw") or {}).get("citation") or "")
+            g = gold.get(r["id"], {})
+            flag_ok = r["got"].get("flag") == "지원불가"
+            p = flag_ok and bool(g.get("gold_phrase")) and g["gold_phrase"] in cit
+            f = flag_ok and bool(g.get("gold_citation")) and g["gold_citation"] in cit
+            res.append((r["id"], p, f))
+        L.append(f"\n## citation 정답 조항 인용 (지원불가 {len(tg)}건)\n")
+        L += ["| 지표 | 적중 |", "|---|---|",
+              f"| P 핵심구절 포함 (주) | {sum(p for _, p, _ in res)}/{len(tg)} |",
+              f"| F 정답 문장 전체 포함 (보조) | {sum(f for _, _, f in res)}/{len(tg)} |", ""]
+        for i, p, f in res:
+            L.append(f"- `{i}` P {'✅' if p else '❌'} / F {'✅' if f else '❌'}")
+        L.append("\n※ 독립 표본 = 3건. temperature 0 + 고정 쿼리라 반복 실행은 독립 표본이 아니다.")
 
     report.write_text("\n".join(L), encoding="utf-8")
     print("\n" + "\n".join(L))
